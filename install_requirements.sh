@@ -1,7 +1,39 @@
 #!/bin/bash
 #
 # BreakNWipe Requirements Installation Script
-# Installs Python packages in the conda environment (no sudo required)
+# Installs Python packages in a virtual environment (no sudo required)
+#
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Functions
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+#!/bin/bash
+#
+# BreakNWipe Requirements Installation Script
+# Installs Python packages in a virtual environment (no sudo required)
 #
 
 set -e
@@ -31,7 +63,8 @@ print_error() {
 }
 
 # Configuration
-ENV_NAME="breaknwipe"
+VENV_DIR="venv"
+PYTHON_CMD="python3.10"
 
 # Check if running as regular user (not root)
 check_user() {
@@ -42,93 +75,67 @@ check_user() {
     fi
 }
 
-# Find conda installation
-find_conda() {
-    local conda_paths=(
-        "$HOME/miniconda3/bin/conda"
-        "/home/alienware_ubuntu/miniconda3"
-        "/opt/miniconda3/bin/conda"
-        "/opt/anaconda3/bin/conda"
-        "/usr/local/miniconda3/bin/conda"
-        "/usr/local/anaconda3/bin/conda"
-    )
+# Check Python 3.10 availability
+check_python() {
+    print_status "Checking Python 3.10 availability..."
 
-    for conda_path in "${conda_paths[@]}"; do
-        if [[ -f "$conda_path" ]]; then
-            echo "$conda_path"
+    if ! command -v "$PYTHON_CMD" &> /dev/null; then
+        print_error "Python 3.10 not found. Please install Python 3.10 first."
+        print_status "You can install it with: sudo apt install python3.10 python3.10-venv"
+        exit 1
+    fi
+
+    # Check version
+    local python_version
+    python_version=$("$PYTHON_CMD" --version 2>&1 | grep -oP 'Python \K[0-9]+\.[0-9]+')
+    if [[ "$python_version" != "3.10" ]]; then
+        print_warning "Found Python $python_version, but Python 3.10 is recommended"
+        print_status "Continuing with available Python version..."
+    fi
+
+    print_success "Found Python: $("$PYTHON_CMD" --version)"
+}
+
+# Create virtual environment
+create_venv() {
+    print_status "Creating virtual environment..."
+
+    if [[ -d "$VENV_DIR" ]]; then
+        print_warning "Virtual environment already exists at $VENV_DIR"
+        read -p "Remove existing venv and create new one? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "$VENV_DIR"
+        else
+            print_status "Using existing virtual environment"
             return 0
         fi
-    done
-
-    # Try conda in PATH
-    if command -v conda &> /dev/null; then
-        echo "conda"
-        return 0
     fi
 
-    return 1
-}
-
-# Check environment setup
-check_environment() {
-    print_status "Checking conda environment setup..."
-
-    # Find conda
-    local conda_cmd
-    if ! conda_cmd=$(find_conda); then
-        print_error "Conda not found. Please install Miniconda or Anaconda first."
-        print_status "You can run: sudo ./install.sh to install the system components"
+    if ! "$PYTHON_CMD" -m venv "$VENV_DIR"; then
+        print_error "Failed to create virtual environment"
         exit 1
     fi
 
-    print_success "Found conda at: $conda_cmd"
-
-    # Check if environment exists
-    if ! "$conda_cmd" info --envs | grep -q "^$ENV_NAME\s"; then
-        print_error "Conda environment '$ENV_NAME' not found"
-        print_status "Please run: sudo ./install.sh first to create the environment"
-        exit 1
-    fi
-
-    print_success "Conda environment '$ENV_NAME' found"
-
-    # Store conda command for later use
-    CONDA_CMD="$conda_cmd"
-
-    # Check and fix permissions if needed
-    check_conda_permissions "$conda_cmd"
+    print_success "Virtual environment created at $VENV_DIR"
 }
 
-# Check conda permissions
-check_conda_permissions() {
-    local conda_cmd="$1"
+# Activate virtual environment and get paths
+setup_venv() {
+    print_status "Setting up virtual environment..."
 
-    # Get conda base directory
-    local conda_base
-    conda_base=$(dirname "$(dirname "$conda_cmd")")
+    # Activate venv
+    source "$VENV_DIR/bin/activate"
 
-    # Check if we can write to conda environment
-    local env_path
-    env_path=$("$conda_cmd" info --envs | grep "^$ENV_NAME\s" | awk '{print $2}')
+    # Store Python executable path
+    PYTHON_EXECUTABLE="$VENV_DIR/bin/python"
 
-    if [[ -n "$env_path" && ! -w "$env_path" ]]; then
-        print_warning "Conda environment permissions need fixing..."
-        print_status "Attempting to fix conda environment ownership..."
-
-        # Try to fix permissions using sudo
-        if sudo chown -R "$USER:$(id -gn)" "$conda_base" 2>/dev/null; then
-            print_success "Fixed conda environment permissions"
-        else
-            print_error "Failed to fix conda permissions. You may need to run:"
-            print_error "sudo chown -R $USER:$(id -gn) $conda_base"
-            exit 1
-        fi
-    fi
+    print_success "Virtual environment activated"
 }
 
 # Install requirements
 install_requirements() {
-    print_status "Installing Python requirements in conda environment..."
+    print_status "Installing Python requirements in virtual environment..."
 
     # Check if requirements.txt exists
     if [[ ! -f "requirements.txt" ]]; then
@@ -138,13 +145,13 @@ install_requirements() {
 
     # Upgrade pip first
     print_status "Upgrading pip..."
-    if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install --upgrade pip; then
+    if ! "$PYTHON_EXECUTABLE" -m pip install --upgrade pip; then
         print_warning "Failed to upgrade pip, continuing..."
     fi
 
     # Install requirements
     print_status "Installing package requirements..."
-    if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install -r requirements.txt; then
+    if ! "$PYTHON_EXECUTABLE" -m pip install -r requirements.txt; then
         print_error "Failed to install requirements"
         exit 1
     fi
@@ -162,13 +169,33 @@ install_breaknwipe() {
         exit 1
     fi
 
-    # Install package in development mode using modern pip method
-    print_status "Installing in editable mode (may show deprecation warnings - this is normal)..."
-    if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install --use-pep517 -e .; then
-        print_warning "Modern installation failed, trying legacy method..."
-        if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install -e . --config-settings editable_mode=compat; then
-            print_error "Failed to install BreakNWipe package"
+    # Make sure we have the latest setuptools and pip
+    print_status "Updating setuptools and pip..."
+    if ! "$PYTHON_EXECUTABLE" -m pip install --upgrade setuptools pip wheel; then
+        print_warning "Failed to update setuptools, continuing anyway..."
+    fi
+
+    # Check if pyproject.toml exists and use different installation method if it does
+    if [[ -f "pyproject.toml" ]]; then
+        print_status "Found pyproject.toml, using PEP 517 installation..."
+        if ! "$PYTHON_EXECUTABLE" -m pip install -e .; then
+            print_error "Failed to install BreakNWipe package using pyproject.toml"
             exit 1
+        fi
+    else
+        # Install package in development mode using modern pip method
+        print_status "Installing in editable mode (may show deprecation warnings - this is normal)..."
+
+        # Try multiple installation methods in order of preference
+        if ! "$PYTHON_EXECUTABLE" -m pip install --use-pep517 -e .; then
+            print_warning "Modern installation failed, trying with config settings..."
+            if ! "$PYTHON_EXECUTABLE" -m pip install -e . --config-settings editable_mode=compat; then
+                print_warning "Config settings method failed, trying legacy method..."
+                if ! "$PYTHON_EXECUTABLE" -m pip install -e .; then
+                    print_error "All installation methods failed for BreakNWipe package"
+                    exit 1
+                fi
+            fi
         fi
     fi
 
@@ -180,14 +207,14 @@ verify_installation() {
     print_status "Verifying installation..."
 
     # Test import
-    if "$CONDA_CMD" run -n "$ENV_NAME" python -c "import breaknwipe; print('BreakNWipe version:', breaknwipe.__version__)" 2>/dev/null; then
+    if "$PYTHON_EXECUTABLE" -c "import breaknwipe; print('BreakNWipe version:', breaknwipe.__version__)" 2>/dev/null; then
         print_success "Package import verification passed"
     else
         print_warning "Package import verification failed"
     fi
 
     # Test CLI
-    if "$CONDA_CMD" run -n "$ENV_NAME" python -m breaknwipe.cli.main --help &>/dev/null; then
+    if "$PYTHON_EXECUTABLE" -m breaknwipe.cli.main --help &>/dev/null; then
         print_success "CLI functionality verification passed"
     else
         print_warning "CLI functionality verification failed"
@@ -208,12 +235,14 @@ show_completion() {
     echo
     echo -e "${BLUE}Next steps:${NC}"
     echo "  • System setup: ${GREEN}sudo ./install.sh${NC} (if not done already)"
-    echo "  • Test CLI: ${GREEN}$CONDA_CMD run -n $ENV_NAME python -m breaknwipe.cli.main --help${NC}"
+    echo "  • Activate venv: ${GREEN}source venv/bin/activate${NC}"
+    echo "  • Test CLI: ${GREEN}python -m breaknwipe.cli.main --help${NC}"
     echo "  • Run demo: ${GREEN}sudo make demo${NC}"
     echo
     echo -e "${BLUE}Environment info:${NC}"
-    echo "  • Conda environment: $ENV_NAME"
-    echo "  • Conda command: $CONDA_CMD"
+    echo "  • Virtual environment: $VENV_DIR"
+    echo "  • Python executable: $PYTHON_EXECUTABLE"
+    echo "  • Python version: $("$PYTHON_EXECUTABLE" --version)"
     echo
     echo -e "${GREEN}Ready to use BreakNWipe!${NC}"
     echo
@@ -222,12 +251,14 @@ show_completion() {
 # Main installation process
 main() {
     echo -e "${BLUE}BreakNWipe Requirements Installer${NC}"
-    echo -e "${BLUE}Installing Python packages in conda environment${NC}"
+    echo -e "${BLUE}Installing Python packages in virtual environment${NC}"
     echo "=================================================="
     echo
 
     check_user
-    check_environment
+    check_python
+    create_venv
+    setup_venv
     install_requirements
     install_breaknwipe
     verify_installation

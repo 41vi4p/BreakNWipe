@@ -76,7 +76,7 @@ install_dependencies() {
         exit 1
     fi
 
-    # Define packages to install (removed Python packages since we'll use conda)
+    # Define packages to install (Python will be installed separately)
     local packages=(
         "wget"
         "curl"
@@ -147,83 +147,69 @@ create_directories() {
     print_success "Directories created"
 }
 
-install_miniconda() {
-    print_status "Installing/checking Miniconda..."
+install_python310() {
+    print_status "Installing/checking Python 3.10..."
 
-    local conda_dir="/opt/miniconda3"
-    local conda_installer="/tmp/Miniconda3-latest-Linux-x86_64.sh"
-
-    # Check if conda is already installed
-    if [[ -f "$conda_dir/bin/conda" ]]; then
-        print_success "Miniconda already installed at $conda_dir"
+    # Check if Python 3.10 is already installed
+    if command -v python3.10 &> /dev/null; then
+        print_success "Python 3.10 already installed"
     else
-        print_status "Downloading Miniconda installer..."
-        if ! wget -q -O "$conda_installer" "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"; then
-            print_error "Failed to download Miniconda installer"
-            exit 1
+        print_status "Installing Python 3.10 and venv support..."
+
+        # Add deadsnakes PPA for Python 3.10 on Ubuntu
+        if ! add-apt-repository -y ppa:deadsnakes/ppa; then
+            print_warning "Failed to add deadsnakes PPA, trying system Python..."
         fi
 
-        print_status "Installing Miniconda..."
-        if ! bash "$conda_installer" -b -p "$conda_dir"; then
-            print_error "Failed to install Miniconda"
-            exit 1
+        # Update package lists
+        apt update
+
+        # Install Python 3.10
+        if ! apt install -y python3.10 python3.10-venv python3.10-dev; then
+            print_error "Failed to install Python 3.10"
+            print_status "Trying to install system Python 3.10..."
+            if ! apt install -y python3.10; then
+                print_error "Failed to install Python 3.10. Please install it manually."
+                exit 1
+            fi
         fi
 
-        # Clean up installer
-        rm -f "$conda_installer"
-        print_success "Miniconda installed successfully"
+        print_success "Python 3.10 installed successfully"
     fi
 
-    # Initialize conda for the current session
-    export PATH="$conda_dir/bin:$PATH"
-
-    # Configure conda to avoid TOS issues
-    print_status "Configuring conda settings..."
-    "$conda_dir/bin/conda" config --set auto_activate_base false
-    "$conda_dir/bin/conda" config --set channel_priority flexible
-
-    # Add conda-forge channel (open source, no TOS issues)
-    "$conda_dir/bin/conda" config --add channels conda-forge
-    "$conda_dir/bin/conda" config --set channel_priority strict
-
-    # Try to accept TOS if needed (this might fail, but we'll handle it)
-    "$conda_dir/bin/conda" config --set allow_conda_downgrades true 2>/dev/null || true
-
-    # Make sure conda is initialized
-    if ! "$conda_dir/bin/conda" --version &>/dev/null; then
-        print_error "Conda installation verification failed"
+    # Verify Python 3.10 installation
+    if ! python3.10 --version &>/dev/null; then
+        print_error "Python 3.10 installation verification failed"
         exit 1
     fi
 
-    print_success "Miniconda setup complete"
+    print_success "Python 3.10 setup complete"
 }
 
-setup_conda_environment() {
-    print_status "Setting up conda environment..."
+setup_venv() {
+    print_status "Setting up virtual environment..."
 
-    local conda_dir="/home/alienware_ubuntu/miniconda3"
-    local env_name="breaknwipe"
+    local venv_dir="$INSTALL_DIR/venv"
 
-    # Make sure conda is in PATH
-    export PATH="$conda_dir/bin:$PATH"
-
-    # Check if environment already exists (improved detection)
-    if "$conda_dir/bin/conda" info --envs | grep -q "^$env_name\s"; then
-        print_success "Conda environment '$env_name' already exists, using existing environment"
+    # Check if venv already exists
+    if [[ -d "$venv_dir" ]]; then
+        print_success "Virtual environment already exists at $venv_dir"
     else
-        print_status "Creating conda environment '$env_name' with Python 3.10..."
-        # Use conda-forge channel to avoid TOS issues
-        if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -c conda-forge -y; then
-            print_error "Failed to create conda environment"
+        print_status "Creating virtual environment with Python 3.10..."
+
+        # Create venv
+        if ! python3.10 -m venv "$venv_dir"; then
+            print_error "Failed to create virtual environment"
             exit 1
         fi
-        print_success "Conda environment '$env_name' created successfully"
+
+        print_success "Virtual environment created successfully"
     fi
 
     # Set ownership
-    chown -R "$USER:$GROUP" "$conda_dir"
+    chown -R "$USER:$GROUP" "$venv_dir"
 
-    print_success "Conda environment setup complete"
+    print_success "Virtual environment setup complete"
 }
 
 create_wrapper_script() {
@@ -235,8 +221,7 @@ create_wrapper_script() {
 # BreakNWipe Wrapper Script
 #
 
-CONDA_DIR="/opt/miniconda3"
-ENV_NAME="breaknwipe"
+VENV_DIR="$INSTALL_DIR/venv"
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -245,11 +230,8 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Make sure conda is in PATH
-export PATH="$CONDA_DIR/bin:$PATH"
-
-# Run BreakNWipe using conda environment
-exec "$CONDA_DIR/bin/conda" run -n "$ENV_NAME" python -m breaknwipe.cli.main "$@"
+# Activate virtual environment and run BreakNWipe
+exec "$VENV_DIR/bin/python" -m breaknwipe.cli.main "$@"
 EOF
 
     chmod +x "$BINARY_DIR/breaknwipe"
@@ -357,8 +339,8 @@ Type=simple
 User=$USER
 Group=$GROUP
 WorkingDirectory=$INSTALL_DIR
-Environment=PATH=/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.daemon
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=$INSTALL_DIR/venv/bin/python -m breaknwipe.daemon
 Restart=always
 RestartSec=10
 
@@ -471,8 +453,6 @@ EOF
 run_post_install_checks() {
     print_status "Running post-installation checks..."
 
-    local conda_dir="/opt/miniconda3"
-
     # Check if binary is accessible
     if ! command -v breaknwipe &> /dev/null; then
         print_warning "breaknwipe command not found in PATH"
@@ -480,24 +460,23 @@ run_post_install_checks() {
         print_success "breaknwipe command is accessible"
     fi
 
-    # Check conda environment
-    export PATH="$conda_dir/bin:$PATH"
-    if "$conda_dir/bin/conda" info --envs | grep -q "^breaknwipe\s"; then
-        print_success "Conda environment 'breaknwipe' ready for package installation"
+    # Check virtual environment
+    if [[ -d "$INSTALL_DIR/venv" ]]; then
+        print_success "Virtual environment exists at $INSTALL_DIR/venv"
         print_status "Run './install_requirements.sh' to install Python packages"
     else
-        print_warning "Conda environment verification failed"
+        print_warning "Virtual environment not found"
     fi
 
-    # Check conda environment exists
-    if "$conda_dir/bin/conda" info --envs | grep -q "^breaknwipe\s"; then
-        print_success "Conda environment 'breaknwipe' exists"
+    # Check Python 3.10 availability
+    if command -v python3.10 &> /dev/null; then
+        print_success "Python 3.10 is available"
     else
-        print_warning "Conda environment 'breaknwipe' not found"
+        print_warning "Python 3.10 not found"
     fi
 
     # Check directories exist
-    for dir in "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "/var/lib/breaknwipe" "$conda_dir"; do
+    for dir in "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "/var/lib/breaknwipe" "$INSTALL_DIR/venv"; do
         if [[ -d "$dir" ]]; then
             print_success "Directory exists: $dir"
         else
@@ -521,8 +500,7 @@ show_completion_message() {
     echo
     echo -e "${BLUE}Installation Summary:${NC}"
     echo "  • Installation directory: $INSTALL_DIR"
-    echo "  • Miniconda directory: /opt/miniconda3"
-    echo "  • Conda environment: breaknwipe (Python 3.10)"
+    echo "  • Virtual environment: $INSTALL_DIR/venv (Python 3.10)"
     echo "  • Configuration files: $CONFIG_DIR"
     echo "  • Log files: $LOG_DIR"
     echo "  • Reports directory: /var/lib/breaknwipe/reports"
@@ -563,10 +541,10 @@ main() {
     check_root
     check_system
     install_dependencies
-    install_miniconda
+    install_python310
     create_user_group
     create_directories
-    setup_conda_environment
+    setup_venv
     create_wrapper_script
     create_config_files
     create_systemd_service
