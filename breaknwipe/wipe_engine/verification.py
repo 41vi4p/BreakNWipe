@@ -6,6 +6,7 @@ Includes statistical analysis and entropy checking.
 """
 
 import os
+import time
 import random
 import logging
 import hashlib

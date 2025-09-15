@@ -7,7 +7,6 @@ rich>=12.0.0              # Rich text and beautiful formatting
 
 # Cryptography and Security
 cryptography>=3.4.8       # Cryptographic recipes and primitives
-hashlib-compat>=1.0.1     # Extended hash algorithms
 pycryptodome>=3.15.0      # Cryptographic library
 
 # PDF Generation and QR Codes
@@ -22,22 +21,10 @@ pyyaml>=6.0               # YAML parser and emitter
 
 # System Integration
 pyudev>=0.23.0            # Python bindings for libudev
-blkinfo>=0.2.0            # Block device information
-smartmontools-python>=0.1.0  # SMART monitoring tools wrapper
 
 # Logging and Monitoring
 structlog>=21.5.0         # Structured logging
-python-systemd>=234       # systemd integration
 prometheus-client>=0.14.0 # Metrics collection
-
-# Development and Testing (optional)
-pytest>=7.0.0             # Testing framework
-pytest-cov>=4.0.0         # Coverage plugin for pytest
-black>=22.0.0             # Code formatter
-flake8>=5.0.0             # Linting
-mypy>=1.0.0               # Static type checking
 
 # Optional Dependencies for Advanced Features
 numpy>=1.21.0             # Numerical computing (for pattern generation)
-scipy>=1.7.0              # Scientific computing (for entropy analysis)
-matplotlib>=3.5.0         # Plotting (for progress visualization)
