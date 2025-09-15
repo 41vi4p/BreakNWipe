@@ -54,8 +54,11 @@ package: build
 
 install-system:
 	@echo "Installing BreakNWipe system-wide..."
-	chmod +x install.sh
+	chmod +x install.sh install_requirements.sh
 	sudo ./install.sh
+	@echo ""
+	@echo "System installation complete. Now installing Python packages..."
+	./install_requirements.sh
 
 uninstall-system:
 	@echo "Removing BreakNWipe from system..."

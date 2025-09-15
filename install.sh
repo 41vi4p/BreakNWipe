@@ -198,46 +198,32 @@ install_miniconda() {
     print_success "Miniconda setup complete"
 }
 
-install_python_environment() {
+setup_conda_environment() {
     print_status "Setting up conda environment..."
 
     local conda_dir="/home/alienware_ubuntu/miniconda3"
     local env_name="breaknwipe"
 
-    # # Make sure conda is in PATH
-    # export PATH="$conda_dir/bin:$PATH"
+    # Make sure conda is in PATH
+    export PATH="$conda_dir/bin:$PATH"
 
-    # # Check if environment already exists (improved detection)
-    # if "$conda_dir/bin/conda" info --envs | grep -q "^$env_name\s"; then
-    #     print_success "Conda environment '$env_name' already exists, using existing environment"
-    # else
-    #     print_status "Creating conda environment '$env_name' with Python 3.10..."
-    #     # Use conda-forge channel to avoid TOS issues
-    #     if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -c conda-forge -y; then
-    #         print_error "Failed to create conda environment"
-    #         exit 1
-    #     fi
-    #     print_success "Conda environment '$env_name' created successfully"
-    # fi
-
-    # Activate environment and install packages
-    print_status "Installing BreakNWipe package in conda environment..."
-
-    # Use conda run to execute commands in the environment
-    if ! "$conda_dir/bin/conda" run -n "$env_name" pip install --upgrade pip; then
-        print_warning "Failed to upgrade pip, continuing..."
-    fi
-
-    # Install BreakNWipe package
-    if ! "$conda_dir/bin/conda" run -n "$env_name" pip install -e .; then
-        print_error "Failed to install BreakNWipe package"
-        exit 1
+    # Check if environment already exists (improved detection)
+    if "$conda_dir/bin/conda" info --envs | grep -q "^$env_name\s"; then
+        print_success "Conda environment '$env_name' already exists, using existing environment"
+    else
+        print_status "Creating conda environment '$env_name' with Python 3.10..."
+        # Use conda-forge channel to avoid TOS issues
+        if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -c conda-forge -y; then
+            print_error "Failed to create conda environment"
+            exit 1
+        fi
+        print_success "Conda environment '$env_name' created successfully"
     fi
 
     # Set ownership
     chown -R "$USER:$GROUP" "$conda_dir"
 
-    print_success "Python environment setup complete"
+    print_success "Conda environment setup complete"
 }
 
 create_wrapper_script() {
@@ -496,10 +482,11 @@ run_post_install_checks() {
 
     # Check conda environment
     export PATH="$conda_dir/bin:$PATH"
-    if "$conda_dir/bin/conda" run -n breaknwipe python -c "import breaknwipe" 2>/dev/null; then
-        print_success "Python package installation verified"
+    if "$conda_dir/bin/conda" info --envs | grep -q "^breaknwipe\s"; then
+        print_success "Conda environment 'breaknwipe' ready for package installation"
+        print_status "Run './install_requirements.sh' to install Python packages"
     else
-        print_warning "Python package verification failed"
+        print_warning "Conda environment verification failed"
     fi
 
     # Check conda environment exists
@@ -540,7 +527,12 @@ show_completion_message() {
     echo "  • Log files: $LOG_DIR"
     echo "  • Reports directory: /var/lib/breaknwipe/reports"
     echo
-    echo -e "${BLUE}Usage:${NC}"
+    echo -e "${BLUE}Next Steps:${NC}"
+    echo "  1. Install Python packages: ${GREEN}./install_requirements.sh${NC}"
+    echo "  2. Test installation: ${GREEN}sudo breaknwipe --help${NC}"
+    echo "  3. Run demo: ${GREEN}sudo make demo${NC}"
+    echo
+    echo -e "${BLUE}Usage (after installing requirements):${NC}"
     echo "  • Interactive mode: ${GREEN}sudo breaknwipe --interactive${NC}"
     echo "  • List devices: ${GREEN}sudo breaknwipe --list-devices${NC}"
     echo "  • Wipe device: ${GREEN}sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear${NC}"
@@ -552,10 +544,10 @@ show_completion_message() {
     echo "  • View logs: ${GREEN}sudo journalctl -u breaknwipe-daemon${NC}"
     echo
     echo -e "${YELLOW}Important Notes:${NC}"
+    echo "  • System setup complete, but Python packages need separate installation"
+    echo "  • Run ${GREEN}./install_requirements.sh${NC} as regular user (no sudo)"
     echo "  • BreakNWipe requires root privileges to access storage devices"
-    echo "  • Always verify device paths before running wipe operations"
     echo "  • Configuration files are located in $CONFIG_DIR"
-    echo "  • Check the documentation for advanced usage"
     echo
     echo -e "${GREEN}Installation completed successfully!${NC}"
     echo
@@ -574,7 +566,7 @@ main() {
     install_miniconda
     create_user_group
     create_directories
-    install_python_environment
+    setup_conda_environment
     create_wrapper_script
     create_config_files
     create_systemd_service
