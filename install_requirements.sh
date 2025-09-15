@@ -46,7 +46,7 @@ check_user() {
 find_conda() {
     local conda_paths=(
         "$HOME/miniconda3/bin/conda"
-        "$HOME/anaconda3/bin/conda"
+        "/home/alienware_ubuntu/miniconda3"
         "/opt/miniconda3/bin/conda"
         "/opt/anaconda3/bin/conda"
         "/usr/local/miniconda3/bin/conda"
@@ -94,6 +94,36 @@ check_environment() {
 
     # Store conda command for later use
     CONDA_CMD="$conda_cmd"
+
+    # Check and fix permissions if needed
+    check_conda_permissions "$conda_cmd"
+}
+
+# Check conda permissions
+check_conda_permissions() {
+    local conda_cmd="$1"
+
+    # Get conda base directory
+    local conda_base
+    conda_base=$(dirname "$(dirname "$conda_cmd")")
+
+    # Check if we can write to conda environment
+    local env_path
+    env_path=$("$conda_cmd" info --envs | grep "^$ENV_NAME\s" | awk '{print $2}')
+
+    if [[ -n "$env_path" && ! -w "$env_path" ]]; then
+        print_warning "Conda environment permissions need fixing..."
+        print_status "Attempting to fix conda environment ownership..."
+
+        # Try to fix permissions using sudo
+        if sudo chown -R "$USER:$(id -gn)" "$conda_base" 2>/dev/null; then
+            print_success "Fixed conda environment permissions"
+        else
+            print_error "Failed to fix conda permissions. You may need to run:"
+            print_error "sudo chown -R $USER:$(id -gn) $conda_base"
+            exit 1
+        fi
+    fi
 }
 
 # Install requirements
@@ -132,10 +162,14 @@ install_breaknwipe() {
         exit 1
     fi
 
-    # Install package in development mode
-    if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install -e .; then
-        print_error "Failed to install BreakNWipe package"
-        exit 1
+    # Install package in development mode using modern pip method
+    print_status "Installing in editable mode (may show deprecation warnings - this is normal)..."
+    if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install --use-pep517 -e .; then
+        print_warning "Modern installation failed, trying legacy method..."
+        if ! "$CONDA_CMD" run -n "$ENV_NAME" pip install -e . --config-settings editable_mode=compat; then
+            print_error "Failed to install BreakNWipe package"
+            exit 1
+        fi
     fi
 
     print_success "BreakNWipe package installed successfully"
