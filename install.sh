@@ -204,21 +204,21 @@ install_python_environment() {
     local conda_dir="/opt/miniconda3"
     local env_name="breaknwipe"
 
-    # Make sure conda is in PATH
-    export PATH="$conda_dir/bin:$PATH"
+    # # Make sure conda is in PATH
+    # export PATH="$conda_dir/bin:$PATH"
 
-    # Check if environment already exists (improved detection)
-    if "$conda_dir/bin/conda" info --envs | grep -q "^$env_name\s"; then
-        print_success "Conda environment '$env_name' already exists, using existing environment"
-    else
-        print_status "Creating conda environment '$env_name' with Python 3.10..."
-        # Use conda-forge channel to avoid TOS issues
-        if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -c conda-forge -y; then
-            print_error "Failed to create conda environment"
-            exit 1
-        fi
-        print_success "Conda environment '$env_name' created successfully"
-    fi
+    # # Check if environment already exists (improved detection)
+    # if "$conda_dir/bin/conda" info --envs | grep -q "^$env_name\s"; then
+    #     print_success "Conda environment '$env_name' already exists, using existing environment"
+    # else
+    #     print_status "Creating conda environment '$env_name' with Python 3.10..."
+    #     # Use conda-forge channel to avoid TOS issues
+    #     if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -c conda-forge -y; then
+    #         print_error "Failed to create conda environment"
+    #         exit 1
+    #     fi
+    #     print_success "Conda environment '$env_name' created successfully"
+    # fi
 
     # Activate environment and install packages
     print_status "Installing BreakNWipe package in conda environment..."
