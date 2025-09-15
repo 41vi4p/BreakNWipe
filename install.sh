@@ -177,6 +177,18 @@ install_miniconda() {
     # Initialize conda for the current session
     export PATH="$conda_dir/bin:$PATH"
 
+    # Configure conda to avoid TOS issues
+    print_status "Configuring conda settings..."
+    "$conda_dir/bin/conda" config --set auto_activate_base false
+    "$conda_dir/bin/conda" config --set channel_priority flexible
+
+    # Add conda-forge channel (open source, no TOS issues)
+    "$conda_dir/bin/conda" config --add channels conda-forge
+    "$conda_dir/bin/conda" config --set channel_priority strict
+
+    # Try to accept TOS if needed (this might fail, but we'll handle it)
+    "$conda_dir/bin/conda" config --set allow_conda_downgrades true 2>/dev/null || true
+
     # Make sure conda is initialized
     if ! "$conda_dir/bin/conda" --version &>/dev/null; then
         print_error "Conda installation verification failed"
@@ -195,12 +207,13 @@ install_python_environment() {
     # Make sure conda is in PATH
     export PATH="$conda_dir/bin:$PATH"
 
-    # Check if environment already exists
-    if "$conda_dir/bin/conda" env list | grep -q "^$env_name "; then
-        print_success "Conda environment '$env_name' already exists"
+    # Check if environment already exists (improved detection)
+    if "$conda_dir/bin/conda" info --envs | grep -q "^$env_name\s"; then
+        print_success "Conda environment '$env_name' already exists, using existing environment"
     else
         print_status "Creating conda environment '$env_name' with Python 3.10..."
-        if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -y; then
+        # Use conda-forge channel to avoid TOS issues
+        if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -c conda-forge -y; then
             print_error "Failed to create conda environment"
             exit 1
         fi
@@ -490,7 +503,7 @@ run_post_install_checks() {
     fi
 
     # Check conda environment exists
-    if "$conda_dir/bin/conda" env list | grep -q "^breaknwipe "; then
+    if "$conda_dir/bin/conda" info --envs | grep -q "^breaknwipe\s"; then
         print_success "Conda environment 'breaknwipe' exists"
     else
         print_warning "Conda environment 'breaknwipe' not found"
