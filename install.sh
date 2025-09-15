@@ -14,6 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
+INSTALL_DIR="/opt/breaknwipe"
 BINARY_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/breaknwipe"
 LOG_DIR="/var/log/breaknwipe"
