@@ -201,7 +201,7 @@ install_miniconda() {
 install_python_environment() {
     print_status "Setting up conda environment..."
 
-    local conda_dir="/opt/miniconda3"
+    local conda_dir="/home/alienware_ubuntu/miniconda3"
     local env_name="breaknwipe"
 
     # # Make sure conda is in PATH
