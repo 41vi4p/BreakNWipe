@@ -62,15 +62,15 @@ uninstall-system:
 	chmod +x uninstall.sh
 	sudo ./uninstall.sh
 
-# Development shortcuts
+# Development shortcuts (using conda environment)
 run-interactive:
-	sudo python -m breaknwipe.cli.main --interactive
+	sudo /opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.cli.main --interactive
 
 run-list:
-	sudo python -m breaknwipe.cli.main --list-devices
+	sudo /opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.cli.main --list-devices
 
 run-help:
-	python -m breaknwipe.cli.main --help
+	/opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.cli.main --help
 
 demo:
 	@echo "Running BreakNWipe demonstration..."
@@ -84,12 +84,12 @@ install-deps:
 	sudo apt-get install -y python3-stdeb rpm ruby ruby-dev rubygems
 	sudo gem install --no-document fpm
 
-# Testing shortcuts
+# Testing shortcuts (using conda environment)
 test-algorithms:
-	python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
+	/opt/miniconda3/bin/conda run -n breaknwipe python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
 
 test-device-detection:
-	sudo python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
+	sudo /opt/miniconda3/bin/conda run -n breaknwipe python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
 
 # Documentation
 docs:
@@ -101,5 +101,5 @@ docs:
 # Security check
 security-check:
 	@echo "Running security checks..."
-	python -c "import os; print('Root check:', os.geteuid() == 0)"
-	python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"
+	/opt/miniconda3/bin/conda run -n breaknwipe python -c "import os; print('Root check:', os.geteuid() == 0)"
+	/opt/miniconda3/bin/conda run -n breaknwipe python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"

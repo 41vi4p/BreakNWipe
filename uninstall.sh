@@ -7,11 +7,11 @@
 set -e
 
 # Colors for output
-RED='\\033[0;31m'
-GREEN='\\033[0;32m'
-YELLOW='\\033[1;33m'
-BLUE='\\033[0;34m'
-NC='\\033[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # Configuration
 INSTALL_DIR="/opt/breaknwipe"
@@ -212,13 +212,13 @@ remove_dependencies() {
         echo
 
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            apt remove --autoremove -y \\
-                smartmontools \\
-                hdparm \\
-                nvme-cli \\
-                python3-dev \\
-                build-essential \\
-                libssl-dev \\
+            apt remove --autoremove -y \
+                smartmontools \
+                hdparm \
+                nvme-cli \
+                python3-dev \
+                build-essential \
+                libssl-dev \
                 libffi-dev 2>/dev/null || true
 
             print_success "System dependencies removed"

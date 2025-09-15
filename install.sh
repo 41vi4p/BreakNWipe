@@ -7,11 +7,11 @@
 set -e
 
 # Colors for output
-RED=' \\033[0;31m '
-GREEN='\\033[0;32m'
-YELLOW='\\033[1;33m'
-BLUE='\\033[0;34m'
-NC='\\033[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # Configuration
 BINARY_DIR="/usr/local/bin"
@@ -57,9 +57,9 @@ check_system() {
         exit 1
     fi
 
-    # Check Python version
-    if ! python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" 2>/dev/null; then
-        print_error "Python 3.8 or higher is required"
+    # Check if we're on x86_64 architecture
+    if [[ $(uname -m) != "x86_64" ]]; then
+        print_error "This installer requires x86_64 architecture"
         exit 1
     fi
 
@@ -69,21 +69,36 @@ check_system() {
 install_dependencies() {
     print_status "Installing system dependencies..."
 
-    apt update
+    # Update package lists
+    if ! apt update; then
+        print_error "Failed to update package lists"
+        exit 1
+    fi
 
-    # System packages
-    apt install -y smartmontools \\
-        hdparm \\
-        nvme-cli \\
-        util-linux \\
-        parted \\
-        lsblk \\
-        build-essential \\
-        python3-dev \\
-        libssl-dev \\
-        libffi-dev
+    # Define packages to install (removed Python packages since we'll use conda)
+    local packages=(
+        "wget"
+        "curl"
+        "smartmontools"
+        "hdparm"
+        "nvme-cli"
+        "util-linux"
+        "parted"
+        "build-essential"
+        "libssl-dev"
+        "libffi-dev"
+    )
 
-    print_success "System dependencies installed"
+    # Install packages one by one for better error handling
+    print_status "Installing required packages..."
+    for package in "${packages[@]}"; do
+        print_status "Installing $package..."
+        if ! apt install -y "$package"; then
+            print_warning "Failed to install $package, continuing..."
+        fi
+    done
+
+    print_success "System dependencies installation completed"
 }
 
 create_user_group() {
@@ -97,8 +112,8 @@ create_user_group() {
 
     # Create user if it doesn't exist
     if ! getent passwd "$USER" > /dev/null 2>&1; then
-        useradd --system --gid "$GROUP" --shell /bin/false \\
-                --home-dir "$INSTALL_DIR" --no-create-home \\
+        useradd --system --gid "$GROUP" --shell /bin/false \
+                --home-dir "$INSTALL_DIR" --no-create-home \
                 "$USER"
         print_status "Created user: $USER"
     fi
@@ -131,24 +146,82 @@ create_directories() {
     print_success "Directories created"
 }
 
+install_miniconda() {
+    print_status "Installing/checking Miniconda..."
+
+    local conda_dir="/opt/miniconda3"
+    local conda_installer="/tmp/Miniconda3-latest-Linux-x86_64.sh"
+
+    # Check if conda is already installed
+    if [[ -f "$conda_dir/bin/conda" ]]; then
+        print_success "Miniconda already installed at $conda_dir"
+    else
+        print_status "Downloading Miniconda installer..."
+        if ! wget -q -O "$conda_installer" "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"; then
+            print_error "Failed to download Miniconda installer"
+            exit 1
+        fi
+
+        print_status "Installing Miniconda..."
+        if ! bash "$conda_installer" -b -p "$conda_dir"; then
+            print_error "Failed to install Miniconda"
+            exit 1
+        fi
+
+        # Clean up installer
+        rm -f "$conda_installer"
+        print_success "Miniconda installed successfully"
+    fi
+
+    # Initialize conda for the current session
+    export PATH="$conda_dir/bin:$PATH"
+
+    # Make sure conda is initialized
+    if ! "$conda_dir/bin/conda" --version &>/dev/null; then
+        print_error "Conda installation verification failed"
+        exit 1
+    fi
+
+    print_success "Miniconda setup complete"
+}
+
 install_python_environment() {
-    print_status "Setting up Python virtual environment..."
+    print_status "Setting up conda environment..."
 
-    # Create virtual environment
-    
+    local conda_dir="/opt/miniconda3"
+    local env_name="breaknwipe"
 
-    # Activate venv and install packages
-    conda activate breaknwipe
+    # Make sure conda is in PATH
+    export PATH="$conda_dir/bin:$PATH"
 
-    
+    # Check if environment already exists
+    if "$conda_dir/bin/conda" env list | grep -q "^$env_name "; then
+        print_success "Conda environment '$env_name' already exists"
+    else
+        print_status "Creating conda environment '$env_name' with Python 3.10..."
+        if ! "$conda_dir/bin/conda" create -n "$env_name" python=3.10 -y; then
+            print_error "Failed to create conda environment"
+            exit 1
+        fi
+        print_success "Conda environment '$env_name' created successfully"
+    fi
+
+    # Activate environment and install packages
+    print_status "Installing BreakNWipe package in conda environment..."
+
+    # Use conda run to execute commands in the environment
+    if ! "$conda_dir/bin/conda" run -n "$env_name" pip install --upgrade pip; then
+        print_warning "Failed to upgrade pip, continuing..."
+    fi
 
     # Install BreakNWipe package
-    pip install -e .
-
-    deactivate
+    if ! "$conda_dir/bin/conda" run -n "$env_name" pip install -e .; then
+        print_error "Failed to install BreakNWipe package"
+        exit 1
+    fi
 
     # Set ownership
-    chown -R "$USER:$GROUP" "$INSTALL_DIR/venv"
+    chown -R "$USER:$GROUP" "$conda_dir"
 
     print_success "Python environment setup complete"
 }
@@ -162,7 +235,8 @@ create_wrapper_script() {
 # BreakNWipe Wrapper Script
 #
 
-INSTALL_DIR="/opt/breaknwipe"
+CONDA_DIR="/opt/miniconda3"
+ENV_NAME="breaknwipe"
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -171,9 +245,11 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Activate virtual environment and run BreakNWipe
-source "$INSTALL_DIR/venv/bin/activate"
-exec python -m breaknwipe.cli.main "$@"
+# Make sure conda is in PATH
+export PATH="$CONDA_DIR/bin:$PATH"
+
+# Run BreakNWipe using conda environment
+exec "$CONDA_DIR/bin/conda" run -n "$ENV_NAME" python -m breaknwipe.cli.main "$@"
 EOF
 
     chmod +x "$BINARY_DIR/breaknwipe"
@@ -281,8 +357,8 @@ Type=simple
 User=$USER
 Group=$GROUP
 WorkingDirectory=$INSTALL_DIR
-Environment=PATH=$INSTALL_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$INSTALL_DIR/venv/bin/python -m breaknwipe.daemon
+Environment=PATH=/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.daemon
 Restart=always
 RestartSec=10
 
@@ -395,6 +471,8 @@ EOF
 run_post_install_checks() {
     print_status "Running post-installation checks..."
 
+    local conda_dir="/opt/miniconda3"
+
     # Check if binary is accessible
     if ! command -v breaknwipe &> /dev/null; then
         print_warning "breaknwipe command not found in PATH"
@@ -402,16 +480,23 @@ run_post_install_checks() {
         print_success "breaknwipe command is accessible"
     fi
 
-    # Check Python environment
-    if source "$INSTALL_DIR/venv/bin/activate" && python -c "import breaknwipe" 2>/dev/null; then
+    # Check conda environment
+    export PATH="$conda_dir/bin:$PATH"
+    if "$conda_dir/bin/conda" run -n breaknwipe python -c "import breaknwipe" 2>/dev/null; then
         print_success "Python package installation verified"
-        deactivate
     else
         print_warning "Python package verification failed"
     fi
 
+    # Check conda environment exists
+    if "$conda_dir/bin/conda" env list | grep -q "^breaknwipe "; then
+        print_success "Conda environment 'breaknwipe' exists"
+    else
+        print_warning "Conda environment 'breaknwipe' not found"
+    fi
+
     # Check directories exist
-    for dir in "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "/var/lib/breaknwipe"; do
+    for dir in "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "/var/lib/breaknwipe" "$conda_dir"; do
         if [[ -d "$dir" ]]; then
             print_success "Directory exists: $dir"
         else
@@ -435,6 +520,8 @@ show_completion_message() {
     echo
     echo -e "${BLUE}Installation Summary:${NC}"
     echo "  • Installation directory: $INSTALL_DIR"
+    echo "  • Miniconda directory: /opt/miniconda3"
+    echo "  • Conda environment: breaknwipe (Python 3.10)"
     echo "  • Configuration files: $CONFIG_DIR"
     echo "  • Log files: $LOG_DIR"
     echo "  • Reports directory: /var/lib/breaknwipe/reports"
@@ -470,6 +557,7 @@ main() {
     check_root
     check_system
     install_dependencies
+    install_miniconda
     create_user_group
     create_directories
     install_python_environment
