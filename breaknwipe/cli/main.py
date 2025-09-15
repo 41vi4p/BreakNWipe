@@ -40,6 +40,7 @@ def display_banner():
     banner.append("BreakNWipe", style="bold blue")
     banner.append(f" v{__version__}", style="dim")
     banner.append("\nSecure Data Wiping for IT Asset Recycling", style="italic")
+    banner.append("\nDeveloped by CodeBreakers Team", style="dim green")
 
     console.print(Panel(banner, style="blue", padding=(1, 2)))
 
@@ -54,6 +55,11 @@ def main(ctx, version, interactive, list_devices, verbose):
 
     if version:
         console.print(f"BreakNWipe version {__version__}")
+        console.print("Developed by CodeBreakers Team")
+        console.print("Team Members:")
+        for member in ["David Porathur", "Blaise Rodrigues", "Vanessa Rodrigues",
+                      "Natasha Lewis", "Chris Lopes", "Anastasia Lopes"]:
+            console.print(f"  • {member}")
         sys.exit(0)
 
     display_banner()

@@ -21,7 +21,7 @@ setup(
     description='Comprehensive secure data wiping CLI utility for IT asset recycling',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    author='BreakNWipe Development Team',
+    author='CodeBreakers Team',
     author_email='contact@breaknwipe.org',
     url='https://github.com/breaknwipe/breaknwipe',
     license='MIT',

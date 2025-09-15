@@ -185,9 +185,17 @@ breaknwipe/
 | NVMe SSD | NVMe Sanitize | 2000 MB/s | ~8 minutes |
 | USB 3.0 | Random 3-pass | 50 MB/s | ~17 hours |
 
-## 🤝 Contributing
+## 👥 Team Credits
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+**BreakNWipe** by **CodeBreakers**:
+
+- **Blaise Rodrigues (Team Lead)** - Algorithms, Testing & Architecture Design
+- **David Porathur** - CLI Utility, Features Integration & Architecture Design
+- **Vanessa Rodrigues** - Nextjs App, Research & Architecture Design
+- **Natasha Lewis** - UI & Research
+- **Chris Lopes** - Nextjs App with digital signature verification
+- **Anastasia Lopes** - UI, frontend & Research
+
 
 ### Development Setup
 
@@ -198,9 +206,6 @@ pip install -e ".[dev]"
 pytest tests/
 ```
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🏛️ Standards Compliance
 
@@ -230,3 +235,5 @@ By providing trustworthy data sanitization, BreakNWipe aims to:
 ---
 
 **🇮🇳 Made for India's e-waste solution | 🌍 Promoting global circular economy**
+
+**Developed by CodeBreakers**

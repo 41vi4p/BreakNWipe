@@ -1,17 +1,20 @@
 # BreakNWipe Development Makefile
 
-.PHONY: help install dev-install test lint format clean build package
+.PHONY: help install dev-install test lint format clean build package install-system uninstall-system demo
 
 help:
 	@echo "BreakNWipe Development Commands:"
-	@echo "  install      - Install package for production use"
-	@echo "  dev-install  - Install package in development mode"
-	@echo "  test         - Run test suite"
-	@echo "  lint         - Run code linting"
-	@echo "  format       - Format code with black"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  build        - Build distribution packages"
-	@echo "  package      - Create installable packages (.deb, .rpm)"
+	@echo "  install          - Install package for production use"
+	@echo "  dev-install      - Install package in development mode"
+	@echo "  test             - Run test suite"
+	@echo "  lint             - Run code linting"
+	@echo "  format           - Format code with black"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  build            - Build distribution packages"
+	@echo "  package          - Create installable packages (.deb, .rpm)"
+	@echo "  install-system   - Install BreakNWipe system-wide"
+	@echo "  uninstall-system - Remove BreakNWipe from system"
+	@echo "  demo             - Run demonstration"
 
 install:
 	pip install -r requirements.txt
@@ -37,6 +40,7 @@ clean:
 	rm -rf dist/
 	rm -rf *.egg-info/
 	rm -rf htmlcov/
+	rm -rf scripts/
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -type d -exec rm -rf {} +
 
@@ -44,11 +48,19 @@ build: clean
 	python setup.py sdist bdist_wheel
 
 package: build
-	# Create .deb package
-	python setup.py --command-packages=stdeb.command bdist_deb
+	@echo "Building distribution packages..."
+	chmod +x build_packages.sh
+	sudo ./build_packages.sh
 
-	# Create .rpm package
-	python setup.py bdist_rpm
+install-system:
+	@echo "Installing BreakNWipe system-wide..."
+	chmod +x install.sh
+	sudo ./install.sh
+
+uninstall-system:
+	@echo "Removing BreakNWipe from system..."
+	chmod +x uninstall.sh
+	sudo ./uninstall.sh
 
 # Development shortcuts
 run-interactive:
@@ -57,8 +69,37 @@ run-interactive:
 run-list:
 	sudo python -m breaknwipe.cli.main --list-devices
 
+run-help:
+	python -m breaknwipe.cli.main --help
+
+demo:
+	@echo "Running BreakNWipe demonstration..."
+	chmod +x demo.sh
+	sudo ./demo.sh
+
 install-deps:
 	sudo apt-get update
 	sudo apt-get install -y python3-dev python3-pip build-essential
 	sudo apt-get install -y smartmontools hdparm nvme-cli
-	sudo apt-get install -y python3-stdeb rpm
+	sudo apt-get install -y python3-stdeb rpm ruby ruby-dev rubygems
+	sudo gem install --no-document fpm
+
+# Testing shortcuts
+test-algorithms:
+	python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
+
+test-device-detection:
+	sudo python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
+
+# Documentation
+docs:
+	@echo "Documentation available:"
+	@echo "  - README.md: Main documentation"
+	@echo "  - DESIGN.md: Architecture and design"
+	@echo "  - CLI help: make run-help"
+
+# Security check
+security-check:
+	@echo "Running security checks..."
+	python -c "import os; print('Root check:', os.geteuid() == 0)"
+	python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"
