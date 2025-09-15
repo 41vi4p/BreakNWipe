@@ -9,7 +9,7 @@ import time
 import logging
 import subprocess
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from .storage import StorageDevice
 

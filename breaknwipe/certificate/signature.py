@@ -8,7 +8,7 @@ import os
 import time
 import json
 import logging
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from pathlib import Path
 
 from cryptography.hazmat.primitives import hashes, serialization
