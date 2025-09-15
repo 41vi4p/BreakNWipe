@@ -7,14 +7,13 @@
 set -e
 
 # Colors for output
-RED='\\033[0;31m'
+RED=' \\033[0;31m '
 GREEN='\\033[0;32m'
 YELLOW='\\033[1;33m'
 BLUE='\\033[0;34m'
 NC='\\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="/opt/breaknwipe"
 BINARY_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/breaknwipe"
 LOG_DIR="/var/log/breaknwipe"
@@ -26,7 +25,7 @@ BREAKNWIPE_VERSION="1.0.0"
 
 # Functions
 print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "${BLUE} [INFO]${NC} $1"
 }
 
 print_success() {
@@ -73,11 +72,7 @@ install_dependencies() {
     apt update
 
     # System packages
-    apt install -y \\
-        python3 \\
-        python3-pip \\
-        python3-venv \\
-        smartmontools \\
+    apt install -y smartmontools \\
         hdparm \\
         nvme-cli \\
         util-linux \\
@@ -140,13 +135,12 @@ install_python_environment() {
     print_status "Setting up Python virtual environment..."
 
     # Create virtual environment
-    python3 -m venv "$INSTALL_DIR/venv"
+    
 
     # Activate venv and install packages
-    source "$INSTALL_DIR/venv/bin/activate"
+    conda activate breaknwipe
 
-    # Upgrade pip
-    pip install --upgrade pip
+    
 
     # Install BreakNWipe package
     pip install -e .
