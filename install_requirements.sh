@@ -66,12 +66,13 @@ print_error() {
 VENV_DIR="venv"
 PYTHON_CMD="python3.10"
 
-# Check if running as regular user (not root)
+# Check if running as regular user (optional - allows root)
 check_user() {
     if [[ $EUID -eq 0 ]]; then
-        print_error "This script should NOT be run as root"
-        print_status "Run without sudo: ./install_requirements.sh"
-        exit 1
+        print_warning "Running as root - this is allowed but not recommended for development"
+        print_status "Consider running as regular user for better security"
+    else
+        print_status "Running as regular user - good for security"
     fi
 }
 
