@@ -5,13 +5,14 @@ Core data wiping algorithms and engine implementation.
 Supports multiple standards including NIST, DoD, and Gutmann methods.
 """
 
-from .algorithms import WipeAlgorithm, AlgorithmType
+from .algorithms import WipeAlgorithm, AlgorithmType, create_algorithm
 from .engine import WipeEngine
 from .verification import WipeVerifier
 
 __all__ = [
     'WipeAlgorithm',
-    'AlgorithmType', 
+    'AlgorithmType',
     'WipeEngine',
     'WipeVerifier',
+    'create_algorithm',
 ]

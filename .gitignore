@@ -1,1 +1,6 @@
-credits.md
+/venv
+/breaknwipe/__pycache__
+/breaknwipe/certificate/__pycache__
+/breaknwipe/cli/__pycache__
+/breaknwipe/device/__pycache__
+/breaknwipe/wipe_engine/__pycache__

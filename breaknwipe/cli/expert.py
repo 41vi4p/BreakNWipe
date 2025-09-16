@@ -10,8 +10,10 @@ from typing import Optional
 from rich.console import Console
 
 from ..device import DeviceDetector, DeviceHandler
-from ..wipe_engine import WipeEngine, AlgorithmType
+from ..wipe_engine import WipeEngine, AlgorithmType, create_algorithm
 from ..certificate import CertificateGenerator
+from ..certificate.report import WipeReport, DeviceInfo, WipePassResult, VerificationResult
+from .progress import WipeProgressDisplay
 
 console = Console()
 
@@ -64,41 +66,131 @@ class ExpertMode:
             console.print("[yellow]DRY RUN MODE - No actual wiping will be performed[/yellow]")
 
         try:
-            # Convert algorithm string to AlgorithmType
-            algo_type = AlgorithmType(algorithm)
+            # Create algorithm instance from string
+            algorithm_instance = create_algorithm(algorithm, passes=passes)
 
-            # Execute wipe
-            result = self.engine.wipe_device(
-                device_path=device,
-                algorithm=algo_type,
-                verify=verify,
-                dry_run=dry_run
-            )
+            if not dry_run:
+                # Create progress display for actual wipe operations
+                with WipeProgressDisplay() as progress_display:
+                    # Setup progress tracking
+                    progress_display.start_wipe_operation(
+                        device_path=device,
+                        device_size=device_info.capacity_bytes,
+                        algorithm_name=algorithm_instance.get_description(),
+                        total_passes=algorithm_instance.get_total_passes()
+                    )
+
+                    # Create progress callback
+                    def progress_callback(progress_info):
+                        if progress_info.current_pass != progress_display.current_pass:
+                            # New pass started
+                            if progress_display.current_pass > 0:
+                                progress_display.complete_pass()
+
+                            current_pass = algorithm_instance.get_passes()[progress_info.current_pass - 1]
+                            progress_display.start_pass(
+                                progress_info.current_pass,
+                                current_pass.description
+                            )
+
+                        # Update progress based on bytes written
+                        bytes_in_current_pass = int(progress_info.current_pass_progress * device_info.capacity_bytes)
+                        bytes_advance = bytes_in_current_pass - (progress_display.bytes_processed % device_info.capacity_bytes)
+
+                        if bytes_advance > 0:
+                            progress_display.update_pass_progress(bytes_advance)
+
+                    # Create engine with progress callback
+                    engine_with_progress = WipeEngine(progress_callback=progress_callback)
+
+                    # Execute wipe with progress tracking
+                    result = engine_with_progress.wipe_device(
+                        device_path=device,
+                        algorithm=algorithm_instance,
+                        verify=verify,
+                        dry_run=dry_run
+                    )
+
+                    # Complete the operation
+                    progress_display.complete_operation(success=result.success)
+            else:
+                # For dry run, use regular engine without progress display
+                result = self.engine.wipe_device(
+                    device_path=device,
+                    algorithm=algorithm_instance,
+                    verify=verify,
+                    dry_run=dry_run
+                )
 
             if result.success:
                 console.print("[green]✓ Wipe operation completed successfully![/green]")
 
                 if generate_certificate and not dry_run:
-                    # Generate certificate
-                    cert_data = {
-                        "device": device,
-                        "algorithm": algorithm,
-                        "passes": passes,
-                        "verify": verify,
-                        "timestamp": result.timestamp.isoformat(),
-                        "success": True
-                    }
+                    # Create proper WipeReport object
+                    device_info_obj = DeviceInfo(
+                        path=device_info.path,
+                        model=device_info.model,
+                        serial=device_info.serial,
+                        capacity_bytes=device_info.capacity_bytes,
+                        capacity_human=device_info.capacity_human,
+                        device_type=str(device_info.device_type),
+                        interface=str(device_info.interface),
+                        vendor=device_info.vendor,
+                        firmware_version=device_info.firmware_version,
+                        wwn=device_info.wwn
+                    )
 
+                    # Create pass result
+                    pass_result = WipePassResult(
+                        pass_number=1,
+                        algorithm=result.algorithm_used,
+                        pattern_description=algorithm_instance.get_passes()[0].description,
+                        start_time=result.start_time,
+                        end_time=result.end_time,
+                        bytes_written=result.total_bytes_written,
+                        success=result.success
+                    )
+
+                    # Create verification result if verification was performed
+                    verification_result = None
+                    if verify:
+                        verification_result = VerificationResult(
+                            verification_type="pattern_check",
+                            passed=result.verification_passed
+                        )
+
+                    # Create complete report
+                    wipe_report = WipeReport(
+                        device_info=device_info_obj,
+                        algorithm_used=result.algorithm_used,
+                        wipe_method="software",
+                        start_time=result.start_time,
+                        end_time=result.end_time,
+                        total_passes=result.total_passes,
+                        success=result.success,
+                        pass_results=[pass_result],
+                        verification_result=verification_result,
+                        total_bytes_written=result.total_bytes_written,
+                        average_speed_mbps=result.average_speed_mbps,
+                        standards_compliance=["NIST SP 800-88"] if "nist" in algorithm else []
+                    )
+
+                    # Set output directory if specified
                     if output_dir:
                         output_path = Path(output_dir)
                         output_path.mkdir(parents=True, exist_ok=True)
-                        cert_file = self.cert_generator.generate_certificate(
-                            cert_data, output_path
-                        )
-                    else:
-                        cert_file = self.cert_generator.generate_certificate(cert_data)
+                        # Store original output directory and restore after
+                        original_output_dir = self.cert_generator.output_directory
+                        self.cert_generator.output_directory = output_path
 
-                    console.print(f"[green]✓ Certificate generated: {cert_file}[/green]")
+                    cert_files = self.cert_generator.generate_certificate(wipe_report)
+
+                    # Restore original output directory if changed
+                    if output_dir:
+                        self.cert_generator.output_directory = original_output_dir
+
+                    for format_type, file_path in cert_files.items():
+                        console.print(f"[green]✓ Certificate generated ({format_type}): {file_path}[/green]")
             else:
                 console.print(f"[red]✗ Wipe operation failed: {result.error_message}[/red]")
                 sys.exit(1)
