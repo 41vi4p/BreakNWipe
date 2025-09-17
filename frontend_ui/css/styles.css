@@ -25,7 +25,7 @@ body {
 }
 
 .container {
-  background: url('../images/circle-bg_component.png') center/cover no-repeat;
+  background: url('/static/images/circle-bg_component.png') center/cover no-repeat;
   border-radius: 1rem;
   min-width: 25rem;
   width: 100%;
@@ -184,7 +184,7 @@ body {
 .header .btn { color: var(--font-color) !important; }
 
 .sub-container {
-  background: url('../images/card_bg.png') center/cover no-repeat;
+  background: url('/static/images/card_bg.png') center/cover no-repeat;
   border-radius: 16px;
   padding: 24px;
   max-width: 720px;

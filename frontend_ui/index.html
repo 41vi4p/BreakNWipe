@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Wipe - Device & Algorithm Selection</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
@@ -17,48 +17,10 @@
                 <h2 class="page-title">Select Device to Clean</h2>
                 
                 <div class="device-grid">
-                    <div class="device-card" data-device="laptop">
-                        <div class="device-icon">💻</div>
-                        <h3>Laptop/Desktop</h3>
-                        <p>Windows, Mac, or Linux systems</p>
-                        <div class="device-info">
-                            <strong>Detected:</strong> HP EliteBook 840<br>
-                            <strong>Storage:</strong> 512GB SSD<br>
-                            <strong>OS:</strong> Windows 11 Pro
-                        </div>
-                    </div>
-                    
-                    <div class="device-card" data-device="mobile">
-                        <div class="device-icon">📱</div>
-                        <h3>Mobile Device</h3>
-                        <p>Android or iOS smartphones/tablets</p>
-                        <div class="device-info">
-                            <strong>Detected:</strong> Samsung Galaxy S23<br>
-                            <strong>Storage:</strong> 256GB<br>
-                            <strong>OS:</strong> Android 14
-                        </div>
-                    </div>
-                    
-                    <div class="device-card" data-device="server">
-                        <div class="device-icon">🖥️</div>
-                        <h3>Server/Workstation</h3>
-                        <p>High-performance systems</p>
-                        <div class="device-info">
-                            <strong>Detected:</strong> Dell PowerEdge R740<br>
-                            <strong>Storage:</strong> 2TB RAID Array<br>
-                            <strong>OS:</strong> Ubuntu Server 22.04
-                        </div>
-                    </div>
-                    
-                    <div class="device-card" data-device="external">
-                        <div class="device-icon">💾</div>
-                        <h3>External Storage</h3>
-                        <p>USB drives, external HDDs/SSDs</p>
-                        <div class="device-info">
-                            <strong>Detected:</strong> SanDisk USB 3.0<br>
-                            <strong>Storage:</strong> 128GB<br>
-                            <strong>Format:</strong> NTFS
-                        </div>
+                    <!-- Devices will be loaded dynamically from API -->
+                    <div style="color: #ccc; text-align: center; grid-column: 1/-1; padding: 40px;">
+                        <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
+                        <p>Loading available devices...</p>
                     </div>
                 </div>
 
@@ -109,12 +71,22 @@
                     availableDevices = await response.json();
                     renderDevices();
                 } else {
-                    console.error('Failed to load devices');
-                    showError('Failed to load devices from system');
+                    // Get detailed error message from the server
+                    let errorMessage = 'Failed to load devices from system';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.detail || errorMessage;
+                    } catch (e) {
+                        // If parsing JSON fails, use status text
+                        errorMessage = response.statusText || errorMessage;
+                    }
+
+                    console.error('Failed to load devices:', errorMessage);
+                    showError(errorMessage);
                 }
             } catch (error) {
                 console.error('Error loading devices:', error);
-                showError('Error communicating with backend');
+                showError('Error communicating with backend: ' + error.message);
             }
         }
 
@@ -132,26 +104,27 @@
                 deviceCard.className = 'device-card';
                 deviceCard.dataset.devicePath = device.path;
 
-                // Map device type to icon
-                const iconMap = {
-                    'laptop': '💻',
-                    'mobile': '📱',
-                    'server': '🖥️',
-                    'external': '💾',
-                    'unknown': '💾'
+                // Map device type to icon and display name
+                const typeMap = {
+                    'laptop': { icon: '💻', name: 'Laptop/Desktop' },
+                    'mobile': { icon: '📱', name: 'Mobile Device' },
+                    'server': { icon: '🖥️', name: 'Server/Workstation' },
+                    'external': { icon: '💾', name: 'External Storage' },
+                    'unknown': { icon: '❓', name: 'Unknown Device' }
                 };
 
-                const icon = iconMap[device.device_type] || '💾';
+                const deviceTypeInfo = typeMap[device.device_type] || typeMap['unknown'];
                 const status = device.is_mounted ? 'Mounted ⚠️' : 'Available';
                 const statusColor = device.is_mounted ? '#ff6b6b' : '#4ecdc4';
 
                 deviceCard.innerHTML = `
-                    <div class="device-icon">${icon}</div>
-                    <h3>${device.device_type.charAt(0).toUpperCase() + device.device_type.slice(1)}</h3>
+                    <div class="device-icon">${deviceTypeInfo.icon}</div>
+                    <h3>${deviceTypeInfo.name}</h3>
                     <p>${device.model}</p>
                     <div class="device-info">
                         <strong>Device:</strong> ${device.path}<br>
                         <strong>Capacity:</strong> ${device.capacity_human}<br>
+                        <strong>Interface:</strong> ${device.interface || 'Unknown'}<br>
                         <strong>Status:</strong> <span style="color: ${statusColor}">${status}</span>
                     </div>
                 `;

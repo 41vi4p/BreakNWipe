@@ -78,9 +78,26 @@ class WebServer:
             """Get list of available storage devices."""
             try:
                 devices = self.session_manager.get_available_devices()
+                if not devices:
+                    # Check if running with root privileges
+                    import os
+                    if os.geteuid() != 0:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Root privileges required for device detection. Please run the web server with sudo."
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=404,
+                            detail="No storage devices found. This could be due to system restrictions or no suitable devices connected."
+                        )
                 return devices
+            except HTTPException:
+                raise
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+                import traceback
+                error_detail = f"Device detection failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+                raise HTTPException(status_code=500, detail=error_detail)
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):

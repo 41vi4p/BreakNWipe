@@ -13,6 +13,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 from ..device import DeviceDetector, DeviceHandler
+from ..device.storage import DeviceInterface
 from ..wipe_engine import WipeEngine, create_algorithm
 from ..certificate import CertificateGenerator
 from .models import (
@@ -44,21 +45,25 @@ class WipeSessionManager:
                 device_type = DeviceType.UNKNOWN
                 if hasattr(device, 'device_type'):
                     type_mapping = {
-                        'ssd': DeviceType.LAPTOP,
                         'hdd': DeviceType.SERVER,
-                        'usb': DeviceType.EXTERNAL,
-                        'nvme': DeviceType.LAPTOP
+                        'ssd_sata': DeviceType.LAPTOP,
+                        'ssd_nvme': DeviceType.LAPTOP,
+                        'usb_flash': DeviceType.EXTERNAL,
+                        'sd_card': DeviceType.EXTERNAL,
+                        'emmc': DeviceType.MOBILE,
+                        'unknown': DeviceType.UNKNOWN
                     }
-                    device_type = type_mapping.get(device.device_type.lower(), DeviceType.UNKNOWN)
+                    device_type_value = device.device_type.value if hasattr(device.device_type, 'value') else str(device.device_type)
+                    device_type = type_mapping.get(device_type_value, DeviceType.UNKNOWN)
 
                 device_info = DeviceInfo(
                     path=device.path,
                     model=device.model,
                     serial=device.serial,
-                    capacity=device.capacity,
+                    capacity=device.capacity_bytes,
                     capacity_human=device.capacity_human,
                     device_type=device_type,
-                    interface=getattr(device, 'interface', 'Unknown'),
+                    interface=getattr(device, 'interface', DeviceInterface.UNKNOWN).value if hasattr(getattr(device, 'interface', DeviceInterface.UNKNOWN), 'value') else str(getattr(device, 'interface', 'Unknown')),
                     is_mounted=device.is_mounted,
                     secure_erase_support=getattr(device, 'secure_erase_support', False)
                 )
