@@ -16,6 +16,7 @@ from ..device import DeviceDetector, DeviceHandler
 from ..device.storage import DeviceInterface
 from ..wipe_engine import WipeEngine, create_algorithm
 from ..certificate import CertificateGenerator
+from ..logging import WipeLoggingService
 from .models import (
     WipeSession, WipeProgress, WipeRequest, DeviceInfo,
     WipeSessionStatus, DeviceType, WipeAlgorithm
@@ -32,6 +33,7 @@ class WipeSessionManager:
         self.executor = ThreadPoolExecutor(max_workers=max_concurrent_wipes)
         self.device_detector = DeviceDetector()
         self.cert_generator = CertificateGenerator()
+        self.logger = WipeLoggingService()
         self._lock = threading.RLock()
 
     def get_available_devices(self) -> List[DeviceInfo]:
@@ -114,6 +116,27 @@ class WipeSessionManager:
             self.sessions[session_id] = session
             self.progress_callbacks[session_id] = []
 
+        # Log wipe operation start
+        try:
+            device_dict = {
+                'path': device_info.path,
+                'model': device_info.model,
+                'serial': device_info.serial,
+                'capacity': device_info.capacity,
+                'capacity_human': device_info.capacity_human,
+                'interface': device_info.interface,
+                'device_type': device_info.device_type.value
+            }
+            wipe_dict = {
+                'algorithm': wipe_request.algorithm.value,
+                'total_passes': self._get_total_passes(wipe_request.algorithm),
+                'verify': wipe_request.verify,
+                'generate_certificate': wipe_request.generate_certificate
+            }
+            self.logger.log_wipe_started(session_id, device_dict, wipe_dict)
+        except Exception as e:
+            print(f"Failed to log wipe start: {e}")
+
         # Submit wipe task to thread pool
         self.executor.submit(self._execute_wipe, session_id)
 
@@ -136,6 +159,13 @@ class WipeSessionManager:
             if session and session.progress.status == WipeSessionStatus.RUNNING:
                 session.progress.status = WipeSessionStatus.CANCELLED
                 session.progress.last_updated = datetime.now()
+
+                # Log cancellation
+                try:
+                    self.logger.log_wipe_cancelled(session_id, "User cancelled operation")
+                except Exception as e:
+                    print(f"Failed to log wipe cancellation: {e}")
+
                 return True
             return False
 
@@ -175,6 +205,7 @@ class WipeSessionManager:
         try:
             # Update status to running
             session.progress.status = WipeSessionStatus.RUNNING
+            session.progress.started_at = datetime.now()
             session.progress.last_updated = datetime.now()
             self._notify_progress_callbacks(session_id)
 
@@ -191,6 +222,18 @@ class WipeSessionManager:
                 # Estimate remaining time
                 if progress.eta_seconds > 0:
                     session.progress.estimated_remaining = progress.eta_seconds
+
+                # Log progress updates (only every 10%)
+                try:
+                    progress_data = {
+                        'status': session.progress.status.value,
+                        'progress_percent': session.progress.progress_percent,
+                        'data_processed': session.progress.data_processed,
+                        'speed_mbps': session.progress.speed_mbps
+                    }
+                    self.logger.log_wipe_progress(session_id, progress_data)
+                except Exception as e:
+                    pass  # Don't let logging errors interrupt wipe
 
                 self._notify_progress_callbacks(session_id)
                 return session.progress.status != WipeSessionStatus.CANCELLED
@@ -229,10 +272,85 @@ class WipeSessionManager:
             # Generate certificate if requested
             if session.wipe_request.generate_certificate and result.success:
                 try:
-                    cert_path = self.cert_generator.generate_certificate(result)
-                    session.certificate_path = cert_path
+                    # Import here to avoid circular imports
+                    from ..certificate.report import WipeReport, DeviceInfo as ReportDeviceInfo
+
+                    # Create WipeReport from result
+                    report_device_info = ReportDeviceInfo(
+                        path=session.device_info.path,
+                        model=session.device_info.model,
+                        serial=session.device_info.serial,
+                        capacity_bytes=session.device_info.capacity,
+                        capacity_human=session.device_info.capacity_human,
+                        device_type=session.device_info.device_type.value,
+                        interface=session.device_info.interface
+                    )
+
+                    wipe_report = WipeReport(
+                        device_info=report_device_info,
+                        algorithm_used=result.algorithm_used,
+                        wipe_method="software",
+                        start_time=result.start_time,
+                        end_time=result.end_time,
+                        total_passes=result.total_passes,
+                        success=result.success,
+                        total_bytes_written=result.total_bytes_written,
+                        average_speed_mbps=result.average_speed_mbps,
+                        organization="BreakNWipe by CodeBreakers",
+                        operator="System User"
+                    )
+
+                    cert_files = self.cert_generator.generate_certificate(wipe_report)
+                    session.certificate_path = cert_files.get('pdf', '')
+
+                    # Store report in database
+                    try:
+                        # Prepare report data for storage
+                        report_data = {
+                            'device_path': session.device_info.path,
+                            'device_model': session.device_info.model,
+                            'device_serial': session.device_info.serial,
+                            'algorithm_used': result.algorithm_used,
+                            'wipe_method': 'software',
+                            'start_time': result.start_time,
+                            'end_time': result.end_time,
+                            'total_passes': result.total_passes,
+                            'success': result.success,
+                            'total_bytes_written': result.total_bytes_written,
+                            'average_speed_mbps': result.average_speed_mbps,
+                            'organization': 'BreakNWipe by CodeBreakers',
+                            'operator': 'System User'
+                        }
+
+                        # Store the report with certificate files
+                        self.logger.store_wipe_report(
+                            session_id=session_id,
+                            report_data=report_data,
+                            certificate_files=cert_files
+                        )
+                    except Exception as e:
+                        print(f"Failed to store report in database: {e}")
+
                 except Exception as e:
                     print(f"Certificate generation failed: {e}")
+
+            # Log wipe completion
+            try:
+                result_data = {
+                    'success': result.success,
+                    'total_bytes_written': result.total_bytes_written,
+                    'average_speed_mbps': result.average_speed_mbps,
+                    'error_message': getattr(result, 'error_message', None)
+                }
+                report_id = f"BNW-{session_id[:8]}-{int(time.time())}"
+                self.logger.log_wipe_completed(
+                    session_id,
+                    result_data,
+                    getattr(session, 'certificate_path', None),
+                    report_id
+                )
+            except Exception as e:
+                print(f"Failed to log wipe completion: {e}")
 
             # Update final status
             if result.success:
@@ -246,6 +364,16 @@ class WipeSessionManager:
             session.progress.status = WipeSessionStatus.FAILED
             session.error_message = str(e)
             print(f"Wipe operation failed: {e}")
+
+            # Log failure
+            try:
+                result_data = {
+                    'success': False,
+                    'error_message': str(e)
+                }
+                self.logger.log_wipe_completed(session_id, result_data)
+            except Exception as log_error:
+                print(f"Failed to log wipe failure: {log_error}")
 
         finally:
             session.progress.last_updated = datetime.now()

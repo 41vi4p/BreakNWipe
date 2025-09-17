@@ -8,6 +8,7 @@ import os
 import asyncio
 import threading
 import webbrowser
+import time
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
@@ -79,6 +80,14 @@ class WebServer:
                 return HTMLResponse(content=frontend_path.read_text(), status_code=200)
             return HTMLResponse(content="<h1>BreakNWipe Web Interface</h1><p>Frontend not found</p>")
 
+        @self.app.get("/index.html", response_class=HTMLResponse)
+        async def index_page():
+            """Serve the main interface via index.html."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "index.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>BreakNWipe Web Interface</h1><p>Frontend not found</p>")
+
         @self.app.get("/progress.html", response_class=HTMLResponse)
         async def progress_page():
             """Serve the progress page."""
@@ -94,6 +103,28 @@ class WebServer:
             if frontend_path.exists():
                 return HTMLResponse(content=frontend_path.read_text(), status_code=200)
             return HTMLResponse(content="<h1>Report Page Not Found</h1>", status_code=404)
+
+        @self.app.get("/logs.html", response_class=HTMLResponse)
+        async def logs_page():
+            """Serve the logs page."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "logs.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>Logs Page Not Found</h1>", status_code=404)
+
+        @self.app.get("/favicon.ico")
+        async def favicon():
+            """Return a simple favicon or 404."""
+            # Check if a favicon exists in the frontend directory
+            favicon_path = Path(__file__).parent.parent.parent / "frontend_ui" / "favicon.ico"
+            if favicon_path.exists():
+                from fastapi.responses import FileResponse
+                return FileResponse(path=str(favicon_path), media_type="image/x-icon")
+
+            # Return a 1x1 transparent gif as a simple favicon
+            from fastapi.responses import Response
+            transparent_gif = b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x04\x01\x00\x3b'
+            return Response(content=transparent_gif, media_type="image/gif")
 
         @self.app.get("/api/devices", response_model=List[DeviceInfo])
         async def get_devices():
@@ -171,6 +202,216 @@ class WebServer:
                 success=True,
                 message="Wipe operation cancelled successfully"
             )
+
+        @self.app.get("/api/wipe/report/{session_id}")
+        async def get_wipe_report(session_id: str):
+            """Get detailed wipe report data for completed session."""
+            session = self.session_manager.get_session(session_id)
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+
+            if session.progress.status != WipeSessionStatus.COMPLETED:
+                raise HTTPException(status_code=400, detail="Session not completed yet")
+
+            # Calculate duration
+            duration_seconds = 0
+            if hasattr(session.progress, 'started_at') and session.progress.started_at:
+                duration_seconds = (session.progress.last_updated - session.progress.started_at).total_seconds()
+
+            report_data = {
+                "session_id": session_id,
+                "device": {
+                    "path": session.device_info.path,
+                    "model": session.device_info.model,
+                    "serial": session.device_info.serial,
+                    "capacity": session.device_info.capacity_human,
+                    "capacity_bytes": session.device_info.capacity,
+                    "interface": session.device_info.interface,
+                    "device_type": session.device_info.device_type
+                },
+                "wipe_details": {
+                    "algorithm": session.wipe_request.algorithm,
+                    "total_passes": session.progress.total_passes,
+                    "verification_enabled": session.wipe_request.verify,
+                    "certificate_generated": session.wipe_request.generate_certificate
+                },
+                "results": {
+                    "status": session.progress.status,
+                    "progress_percent": session.progress.progress_percent,
+                    "data_processed_bytes": session.progress.data_processed,
+                    "average_speed_mbps": session.progress.speed_mbps,
+                    "duration_seconds": duration_seconds,
+                    "started_at": session.progress.started_at.isoformat() if session.progress.started_at else None,
+                    "completed_at": session.progress.last_updated.isoformat()
+                },
+                "certificate_path": getattr(session, 'certificate_path', None),
+                "report_id": f"BNW-{session_id[:8]}-{int(time.time())}"
+            }
+
+            return report_data
+
+        @self.app.get("/api/wipe/download/{session_id}")
+        async def download_certificate(session_id: str):
+            """Download the generated certificate PDF."""
+            session = self.session_manager.get_session(session_id)
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+
+            if not hasattr(session, 'certificate_path') or not session.certificate_path:
+                raise HTTPException(status_code=404, detail="Certificate not generated")
+
+            cert_path = Path(session.certificate_path)
+            if not cert_path.exists():
+                raise HTTPException(status_code=404, detail="Certificate file not found")
+
+            from fastapi.responses import FileResponse
+            return FileResponse(
+                path=str(cert_path),
+                filename=f"BreakNWipe_Certificate_{session_id[:8]}.pdf",
+                media_type="application/pdf"
+            )
+
+        @self.app.get("/api/logs")
+        async def get_logs(device_path: str = None, status: str = None,
+                          limit: int = 100, offset: int = 0, search: str = None):
+            """Get wipe operation logs with optional filtering."""
+            try:
+                if search:
+                    logs = self.session_manager.logger.search_logs(search, limit)
+                else:
+                    logs = self.session_manager.logger.get_logs(device_path, status, limit, offset)
+
+                return {
+                    "success": True,
+                    "data": logs,
+                    "total": len(logs)
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/logs/{session_id}")
+        async def get_log_by_session(session_id: str):
+            """Get a specific log by session ID."""
+            try:
+                log = self.session_manager.logger.get_log_by_session(session_id)
+                if not log:
+                    raise HTTPException(status_code=404, detail="Log not found")
+
+                return {
+                    "success": True,
+                    "data": log
+                }
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/logs/device/{device_path:path}")
+        async def get_device_logs(device_path: str):
+            """Get all logs for a specific device."""
+            try:
+                logs = self.session_manager.logger.get_device_logs(device_path)
+                return {
+                    "success": True,
+                    "data": logs,
+                    "total": len(logs)
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/logs/statistics")
+        async def get_log_statistics():
+            """Get logging statistics."""
+            try:
+                stats = self.session_manager.logger.get_statistics()
+                return {
+                    "success": True,
+                    "data": stats
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/logs/device-history")
+        async def get_device_history(device_path: str = None):
+            """Get device history records."""
+            try:
+                history = self.session_manager.logger.get_device_history(device_path)
+                return {
+                    "success": True,
+                    "data": history
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/logs/audit/{session_id}")
+        async def get_audit_trail(session_id: str):
+            """Get audit trail for a specific session."""
+            try:
+                audit_events = self.session_manager.logger.get_audit_trail(session_id)
+                return {
+                    "success": True,
+                    "data": audit_events
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        # Reports API endpoints
+        @self.app.get("/api/reports")
+        async def get_reports(device_path: str = None, limit: int = 100, offset: int = 0):
+            """Get wipe reports with optional filtering."""
+            try:
+                reports = self.session_manager.logger.get_reports(device_path, limit, offset)
+                return reports
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/reports/{session_id}")
+        async def get_report_by_session(session_id: str):
+            """Get a specific report by session ID."""
+            try:
+                report = self.session_manager.logger.get_report_by_session(session_id)
+                if not report:
+                    raise HTTPException(status_code=404, detail="Report not found")
+                return report
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/reports/device/{device_path:path}")
+        async def get_device_reports(device_path: str):
+            """Get all reports for a specific device."""
+            try:
+                reports = self.session_manager.logger.get_device_reports(device_path)
+                return reports
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/download{file_path:path}")
+        async def download_report_file(file_path: str):
+            """Download a report file (PDF, JSON, or QR code image)."""
+            try:
+                import os
+                from fastapi.responses import FileResponse
+
+                # Security check - ensure file path is within allowed directories
+                if not os.path.exists(file_path) or not os.path.isfile(file_path):
+                    raise HTTPException(status_code=404, detail="File not found")
+
+                # Additional security: check if file is in a reports/certificates directory
+                allowed_dirs = ['/tmp', '/var/tmp', str(Path.home() / '.breaknwipe')]
+                if not any(file_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+                    raise HTTPException(status_code=403, detail="Access denied")
+
+                return FileResponse(
+                    path=file_path,
+                    filename=os.path.basename(file_path),
+                    media_type='application/octet-stream'
+                )
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.websocket("/ws/{session_id}")
         async def websocket_endpoint(websocket: WebSocket, session_id: str):

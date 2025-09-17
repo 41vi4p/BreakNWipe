@@ -90,6 +90,16 @@
                         <div class="stat-label">Current Pass</div>
                     </div>
                 </div>
+
+                <!-- Cancel Button Section -->
+                <div style="text-align: center; margin-top: 40px;">
+                    <button class="btn btn-secondary" id="cancelBtn" onclick="cancelOperation()" style="background: #e74c3c; border-color: #e74c3c;">
+                        ⏹️ Cancel Operation
+                    </button>
+                    <p style="margin-top: 10px; color: var(--text-gray); font-size: 0.9rem;">
+                        Cancelling will stop the wipe process immediately
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -161,6 +171,12 @@
             };
 
             document.getElementById('securityLevel').textContent = algorithmMap[selectedAlgorithm] || 'Unknown';
+
+            // Initially hide cancel button until operation starts
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (cancelBtn) {
+                cancelBtn.style.display = 'none';
+            }
 
             connectWebSocket();
             animateStatCards();
@@ -266,15 +282,25 @@
         function updateStatus(status) {
             const statusIndicator = document.querySelector('.status-indicator');
             const statusText = statusIndicator.parentElement;
+            const cancelBtn = document.getElementById('cancelBtn');
 
             switch (status) {
                 case 'running':
                     statusIndicator.className = 'status-indicator status-running';
                     statusText.innerHTML = '<span class="status-indicator status-running"></span>Operation in progress...';
+                    // Show cancel button for running operations
+                    if (cancelBtn) {
+                        cancelBtn.style.display = 'inline-block';
+                    }
                     break;
                 case 'completed':
                     statusIndicator.className = 'status-indicator status-complete';
                     statusText.innerHTML = '<span class="status-indicator status-complete"></span>Operation completed successfully!';
+
+                    // Hide cancel button
+                    if (cancelBtn) {
+                        cancelBtn.style.display = 'none';
+                    }
 
                     // Stop timer and complete all progress indicators
                     stopTimeElapsedCounter();
@@ -309,10 +335,20 @@
                 case 'failed':
                     statusIndicator.className = 'status-indicator status-error';
                     statusText.innerHTML = '<span class="status-indicator status-error"></span>Operation failed!';
+                    // Hide cancel button for failed operations
+                    if (cancelBtn) {
+                        cancelBtn.style.display = 'none';
+                    }
+                    stopTimeElapsedCounter();
                     break;
                 case 'cancelled':
                     statusIndicator.className = 'status-indicator status-error';
                     statusText.innerHTML = '<span class="status-indicator status-error"></span>Operation cancelled!';
+                    // Hide cancel button for cancelled operations
+                    if (cancelBtn) {
+                        cancelBtn.style.display = 'none';
+                    }
+                    stopTimeElapsedCounter();
                     break;
             }
         }
@@ -339,6 +375,95 @@
                     }, index * 150);
                 });
             }, 500);
+        }
+
+        // Cancel operation
+        async function cancelOperation() {
+            if (!sessionId) {
+                showError('No active session to cancel');
+                return;
+            }
+
+            // Show confirmation dialog
+            if (!confirm('Are you sure you want to cancel the wipe operation? This will stop the process immediately and data may not be fully wiped.')) {
+                return;
+            }
+
+            try {
+                // Disable the cancel button to prevent multiple clicks
+                const cancelBtn = document.getElementById('cancelBtn');
+                cancelBtn.disabled = true;
+                cancelBtn.textContent = '⏳ Cancelling...';
+                cancelBtn.style.background = '#95a5a6';
+
+                // Send cancel request to server
+                const response = await fetch(`/api/wipe/cancel/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    // Update UI to show cancellation
+                    updateStatus('cancelled');
+
+                    // Stop the timer
+                    stopTimeElapsedCounter();
+
+                    // Show success message
+                    showNotification('Operation cancelled successfully', 'info');
+
+                    // Redirect to main page after a delay
+                    setTimeout(() => {
+                        sessionStorage.clear();
+                        window.location.href = 'index.html';
+                    }, 3000);
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to cancel operation');
+                }
+            } catch (error) {
+                console.error('Cancel error:', error);
+                showError('Failed to cancel operation: ' + error.message);
+
+                // Re-enable the cancel button
+                const cancelBtn = document.getElementById('cancelBtn');
+                cancelBtn.disabled = false;
+                cancelBtn.innerHTML = '⏹️ Cancel Operation';
+                cancelBtn.style.background = '#e74c3c';
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            const bgColor = type === 'success' ? '#4ecdc4' : type === 'info' ? '#3498db' : '#e74c3c';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${bgColor};
+                color: white;
+                padding: 15px;
+                border-radius: 5px;
+                z-index: 1000;
+                max-width: 300px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    document.body.removeChild(notification);
+                }
+            }, 5000);
+        }
+
+        // Show error message
+        function showError(message) {
+            showNotification(message, 'error');
         }
 
         // Clean up WebSocket when page unloads
