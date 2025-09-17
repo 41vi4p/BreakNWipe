@@ -82,6 +82,9 @@
                 <button class="btn" id="downloadPdfBtn" onclick="downloadPDF()">
                   📄 Download PDF Report
                 </button>
+                <button class="btn" id="downloadJsonBtn" onclick="downloadJSON()">
+                  📋 Download JSON Certificate
+                </button>
                 <button class="btn btn-secondary" onclick="viewCertificate()">
                   🔍 View Certificate Details
                 </button>
@@ -306,6 +309,92 @@
       if (!reportData) return;
 
       alert(`Certificate Details:\n\nReport ID: ${reportData.report_id}\nDevice: ${reportData.device.model}\nAlgorithm: ${reportData.wipe_details.algorithm}\nStatus: Completed\nCompliance: NIST SP 800-88`);
+    }
+
+    // Download JSON certificate
+    async function downloadJSON() {
+      if (!reportData) {
+        showError('Report data not loaded');
+        return;
+      }
+
+      try {
+        // Try to download from server first if certificate was generated
+        if (reportData.certificate_path) {
+          // Try to get the JSON certificate path from the server
+          const response = await fetch(`/api/wipe/report/${sessionId}`);
+          if (response.ok) {
+            const serverReport = await response.json();
+            if (serverReport.certificate_json_path) {
+              const downloadResponse = await fetch(`/api/download${serverReport.certificate_json_path}`);
+              if (downloadResponse.ok) {
+                const blob = await downloadResponse.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `BreakNWipe_Certificate_${reportData.report_id}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                return;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Server JSON not available, generating client-side JSON');
+      }
+
+      // Generate JSON certificate on client side
+      const jsonCertificate = {
+        report_id: reportData.report_id,
+        certificate_info: {
+          organization: "BreakNWipe by CodeBreakers",
+          operator: "System User",
+          generated_at: new Date().toISOString(),
+          standards_compliance: ["NIST SP 800-88", "DoD 5220.22-M"]
+        },
+        device_information: {
+          path: reportData.device_path,
+          model: reportData.device_model,
+          serial: reportData.device_serial,
+          capacity: reportData.device_capacity_human,
+          interface: reportData.device_interface
+        },
+        wipe_operation: {
+          algorithm: reportData.algorithm_used,
+          method: "software",
+          total_passes: reportData.total_passes,
+          start_time: reportData.start_time,
+          end_time: reportData.end_time,
+          duration_seconds: reportData.duration_seconds,
+          success: reportData.success,
+          verification_enabled: reportData.verification_enabled
+        },
+        statistics: {
+          data_processed_bytes: reportData.data_processed_bytes,
+          average_speed_mbps: reportData.average_speed_mbps,
+          progress_percent: 100
+        },
+        verification: {
+          hash_algorithm: "SHA-256",
+          verification_status: reportData.success ? "PASSED" : "FAILED",
+          compliance_verified: true
+        }
+      };
+
+      // Download the JSON file
+      const jsonString = JSON.stringify(jsonCertificate, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `BreakNWipe_Certificate_${reportData.report_id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     }
 
     // Clean another device

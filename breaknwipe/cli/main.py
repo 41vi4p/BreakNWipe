@@ -59,9 +59,9 @@ def display_banner():
 @click.option('--verbose', '-v', count=True, help='Increase verbosity level')
 @click.option('--host', default='127.0.0.1', help='Web server host (default: 127.0.0.1)')
 @click.option('--port', default=8000, type=int, help='Web server port (default: 8000)')
-@click.option('--no-browser', is_flag=True, help='Do not automatically open browser')
+@click.option('--browser', is_flag=True, help='Automatically open browser (disabled by default)')
 @click.pass_context
-def main(ctx, version, interactive, gui, list_devices, verbose, host, port, no_browser):
+def main(ctx, version, interactive, gui, list_devices, verbose, host, port, browser):
     """BreakNWipe - Comprehensive secure data wiping utility."""
 
     if version:
@@ -103,7 +103,7 @@ def main(ctx, version, interactive, gui, list_devices, verbose, host, port, no_b
         console.print(f"[blue]Starting BreakNWipe Web Interface...[/blue]")
         console.print(f"Server will be available at: [bold]http://{host}:{port}[/bold]")
 
-        if not no_browser:
+        if browser:
             console.print("Opening browser automatically...")
         else:
             console.print("Browser auto-open disabled. Open the URL manually.")
@@ -111,7 +111,7 @@ def main(ctx, version, interactive, gui, list_devices, verbose, host, port, no_b
         console.print("\n[yellow]Press Ctrl+C to stop the server[/yellow]\n")
 
         try:
-            web_server = WebServer(host=host, port=port, open_browser=not no_browser)
+            web_server = WebServer(host=host, port=port, open_browser=browser)
             web_server.start()
         except KeyboardInterrupt:
             console.print("\n[yellow]Server stopped by user[/yellow]")

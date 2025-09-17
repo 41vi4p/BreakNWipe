@@ -29,7 +29,7 @@ from .session_manager import WipeSessionManager
 class WebServer:
     """FastAPI web server for BreakNWipe GUI."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True):
+    def __init__(self, host: str = "127.0.0.1", port: int = 8000, open_browser: bool = False):
         """Initialize the web server."""
         self.host = host
         self.port = port
@@ -111,6 +111,22 @@ class WebServer:
             if frontend_path.exists():
                 return HTMLResponse(content=frontend_path.read_text(), status_code=200)
             return HTMLResponse(content="<h1>Logs Page Not Found</h1>", status_code=404)
+
+        @self.app.get("/reports.html", response_class=HTMLResponse)
+        async def reports_page():
+            """Serve the reports page."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "reports.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>Reports Page Not Found</h1>", status_code=404)
+
+        @self.app.get("/about.html", response_class=HTMLResponse)
+        async def about_page():
+            """Serve the about page."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "about.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>About Page Not Found</h1>", status_code=404)
 
         @self.app.get("/favicon.ico")
         async def favicon():
@@ -399,7 +415,14 @@ class WebServer:
                     raise HTTPException(status_code=404, detail="File not found")
 
                 # Additional security: check if file is in a reports/certificates directory
-                allowed_dirs = ['/tmp', '/var/tmp', str(Path.home() / '.breaknwipe')]
+                allowed_dirs = [
+                    '/tmp',
+                    '/var/tmp',
+                    str(Path.home() / '.breaknwipe'),
+                    '/root/breaknwipe_reports',  # Certificate storage directory
+                    '/home',  # User home directories
+                    str(Path.cwd())  # Current working directory
+                ]
                 if not any(file_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
                     raise HTTPException(status_code=403, detail="Access denied")
 
@@ -465,6 +488,47 @@ class WebServer:
         async def health_check():
             """Health check endpoint."""
             return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+        @self.app.get("/api/system-info")
+        async def system_info():
+            """Get system information for the about page."""
+            try:
+                import platform
+
+                # Basic system information without requiring psutil
+                system_info = {
+                    "Operating System": f"{platform.system()} {platform.release()}",
+                    "Architecture": platform.machine(),
+                    "Python Version": platform.python_version(),
+                    "Platform": platform.platform(),
+                    "Processor": platform.processor() or "Unknown",
+                    "Hostname": os.getenv('HOSTNAME', 'Unknown'),
+                    "Current User": os.getenv('USER', os.getenv('USERNAME', 'Unknown')),
+                    "Server Port": "8000",
+                    "Database": "SQLite",
+                    "Web Framework": "FastAPI + Uvicorn",
+                    "Server Status": "Running"
+                }
+
+                # Try to get additional info if psutil is available
+                try:
+                    import psutil
+                    system_info["CPU Count"] = psutil.cpu_count()
+                    system_info["Memory (Total)"] = f"{psutil.virtual_memory().total // (1024**3)} GB"
+                    system_info["Memory (Available)"] = f"{psutil.virtual_memory().available // (1024**3)} GB"
+                    system_info["CPU Usage"] = f"{psutil.cpu_percent(interval=1)}%"
+                except ImportError:
+                    pass
+
+                return system_info
+            except Exception as e:
+                # Fallback system info
+                return {
+                    "Operating System": "Unknown",
+                    "Python Version": "Unknown",
+                    "Server Status": "Running",
+                    "Error": f"System info unavailable: {str(e)}"
+                }
 
     async def _broadcast_progress(self, session_id: str, progress: WipeProgress):
         """Broadcast progress updates to connected WebSocket clients."""
