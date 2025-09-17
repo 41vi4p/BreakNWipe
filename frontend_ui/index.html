@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Wipe - Device & Algorithm Selection</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="page active" id="deviceSelection">
+            <div class="header">
+                <h1>⚫ Data Wipe</h1>
+                <p>Professional Data Cleaning Solution</p>
+            </div>
+            <div class="content">
+                <h2 class="page-title">Select Device to Clean</h2>
+                
+                <div class="device-grid">
+                    <div class="device-card" data-device="laptop">
+                        <div class="device-icon">💻</div>
+                        <h3>Laptop/Desktop</h3>
+                        <p>Windows, Mac, or Linux systems</p>
+                        <div class="device-info">
+                            <strong>Detected:</strong> HP EliteBook 840<br>
+                            <strong>Storage:</strong> 512GB SSD<br>
+                            <strong>OS:</strong> Windows 11 Pro
+                        </div>
+                    </div>
+                    
+                    <div class="device-card" data-device="mobile">
+                        <div class="device-icon">📱</div>
+                        <h3>Mobile Device</h3>
+                        <p>Android or iOS smartphones/tablets</p>
+                        <div class="device-info">
+                            <strong>Detected:</strong> Samsung Galaxy S23<br>
+                            <strong>Storage:</strong> 256GB<br>
+                            <strong>OS:</strong> Android 14
+                        </div>
+                    </div>
+                    
+                    <div class="device-card" data-device="server">
+                        <div class="device-icon">🖥️</div>
+                        <h3>Server/Workstation</h3>
+                        <p>High-performance systems</p>
+                        <div class="device-info">
+                            <strong>Detected:</strong> Dell PowerEdge R740<br>
+                            <strong>Storage:</strong> 2TB RAID Array<br>
+                            <strong>OS:</strong> Ubuntu Server 22.04
+                        </div>
+                    </div>
+                    
+                    <div class="device-card" data-device="external">
+                        <div class="device-icon">💾</div>
+                        <h3>External Storage</h3>
+                        <p>USB drives, external HDDs/SSDs</p>
+                        <div class="device-info">
+                            <strong>Detected:</strong> SanDisk USB 3.0<br>
+                            <strong>Storage:</strong> 128GB<br>
+                            <strong>Format:</strong> NTFS
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Algorithm Selection -->
+                <h2 class="page-title">Select Data Wiping Algorithm</h2>
+
+                <div class="device-grid" id="algorithmGrid">
+                    <div class="device-card" data-algo="zeroFill">
+                        <div class="device-icon">0️⃣</div>
+                        <h3>Zero Fill</h3>
+                        <p>Overwrite data with zeros (fast, basic)</p>
+                    </div>
+
+                    <div class="device-card" data-algo="randomFill">
+                        <div class="device-icon">🎲</div>
+                        <h3>Random Fill</h3>
+                        <p>Overwrite data with random values (more secure)</p>
+                    </div>
+
+                    <div class="device-card" data-algo="gutmann">
+                        <div class="device-icon">🌀</div>
+                        <h3>Gutmann Method</h3>
+                        <p>35-pass method for high security</p>
+                    </div>
+
+                    <div class="device-card" data-algo="doD">
+                        <div class="device-icon">🇺🇸</div>
+                        <h3>DoD 5220.22-M</h3>
+                        <p>3-pass US Department of Defense standard</p>
+                    </div>
+                </div>
+
+                <button class="btn" id="startCleaningBtn" disabled>Start Data Cleaning Process</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedDevice = null;
+        let selectedAlgorithm = null;
+        let availableDevices = [];
+
+        // Load available devices from API
+        async function loadDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                if (response.ok) {
+                    availableDevices = await response.json();
+                    renderDevices();
+                } else {
+                    console.error('Failed to load devices');
+                    showError('Failed to load devices from system');
+                }
+            } catch (error) {
+                console.error('Error loading devices:', error);
+                showError('Error communicating with backend');
+            }
+        }
+
+        function renderDevices() {
+            const deviceGrid = document.querySelector('.device-grid:first-of-type');
+            deviceGrid.innerHTML = '';
+
+            if (availableDevices.length === 0) {
+                deviceGrid.innerHTML = '<p style="color: #ccc; text-align: center; grid-column: 1/-1;">No storage devices found. Please ensure devices are connected and try again.</p>';
+                return;
+            }
+
+            availableDevices.forEach((device, index) => {
+                const deviceCard = document.createElement('div');
+                deviceCard.className = 'device-card';
+                deviceCard.dataset.devicePath = device.path;
+
+                // Map device type to icon
+                const iconMap = {
+                    'laptop': '💻',
+                    'mobile': '📱',
+                    'server': '🖥️',
+                    'external': '💾',
+                    'unknown': '💾'
+                };
+
+                const icon = iconMap[device.device_type] || '💾';
+                const status = device.is_mounted ? 'Mounted ⚠️' : 'Available';
+                const statusColor = device.is_mounted ? '#ff6b6b' : '#4ecdc4';
+
+                deviceCard.innerHTML = `
+                    <div class="device-icon">${icon}</div>
+                    <h3>${device.device_type.charAt(0).toUpperCase() + device.device_type.slice(1)}</h3>
+                    <p>${device.model}</p>
+                    <div class="device-info">
+                        <strong>Device:</strong> ${device.path}<br>
+                        <strong>Capacity:</strong> ${device.capacity_human}<br>
+                        <strong>Status:</strong> <span style="color: ${statusColor}">${status}</span>
+                    </div>
+                `;
+
+                deviceCard.addEventListener('click', () => {
+                    if (device.is_mounted) {
+                        showError('Cannot wipe mounted devices. Please unmount first.');
+                        return;
+                    }
+
+                    document.querySelectorAll('.device-grid:first-of-type .device-card').forEach(c => c.classList.remove('selected'));
+                    deviceCard.classList.add('selected');
+                    selectedDevice = device;
+                    checkStartButton();
+                });
+
+                deviceGrid.appendChild(deviceCard);
+            });
+        }
+
+        // Algorithm selection
+        document.querySelectorAll('#algorithmGrid .device-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('#algorithmGrid .device-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedAlgorithm = card.dataset.algo;
+                checkStartButton();
+            });
+        });
+
+        function checkStartButton() {
+            document.getElementById('startCleaningBtn').disabled = !(selectedDevice && selectedAlgorithm);
+        }
+
+        document.getElementById('startCleaningBtn').addEventListener('click', async () => {
+            if (selectedDevice && selectedAlgorithm) {
+                try {
+                    const wipeRequest = {
+                        device_path: selectedDevice.path,
+                        algorithm: selectedAlgorithm,
+                        verify: true,
+                        generate_certificate: true
+                    };
+
+                    const response = await fetch('/api/wipe/start', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(wipeRequest)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        sessionStorage.setItem('sessionId', result.data.session_id);
+                        sessionStorage.setItem('selectedDevice', JSON.stringify(selectedDevice));
+                        sessionStorage.setItem('selectedAlgorithm', selectedAlgorithm);
+                        window.location.href = 'progress.html';
+                    } else {
+                        const error = await response.json();
+                        showError('Failed to start wipe operation: ' + error.detail);
+                    }
+                } catch (error) {
+                    console.error('Error starting wipe:', error);
+                    showError('Error starting wipe operation');
+                }
+            }
+        });
+
+        function showError(message) {
+            // Create error notification
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ff6b6b; color: white; padding: 15px; border-radius: 5px; z-index: 1000; max-width: 300px;';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => {
+                document.body.removeChild(errorDiv);
+            }, 5000);
+        }
+
+        // Load devices on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDevices();
+
+            // Animate algorithm cards
+            const algorithmCards = document.querySelectorAll('#algorithmGrid .device-card');
+            algorithmCards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(50px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, (index + 4) * 200); // Offset after device cards
+            });
+        });
+    </script>
+</body>
+</html>

@@ -79,5 +79,11 @@ setup(
             'sphinx>=5.0',
             'sphinx-rtd-theme>=1.0',
         ],
+        'web': [
+            'fastapi>=0.104.0',
+            'uvicorn[standard]>=0.24.0',
+            'websockets>=11.0.0',
+            'aiofiles>=23.2.1',
+        ],
     },
 )

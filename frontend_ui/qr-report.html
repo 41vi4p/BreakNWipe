@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Wipe - Cleaning Report</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="page active" id="qrPage">
+      <div class="header">
+        <h1>⚫ Data Wipe</h1>
+        <p>Data cleaning operation completed successfully</p>
+      </div>
+      <div class="content">
+        <div class="qr-container">
+          <div class="success-icon">✅</div>
+          <h2 class="page-title">Cleaning Report Generated</h2>
+          <p style="margin: 20px 0; font-size: 1.1rem; color: var(--text-gray);">
+            Scan the QR code below to access the detailed cleaning report and certificate
+          </p>
+
+          <!-- QR Code Image -->
+          <div class="qr-code" style="text-align:center;">
+            <img src="test_qr.png" alt="QR Code" style="width:250px; height:250px;" />
+            <p id="qrLink" style="margin-top: 15px;">
+              <a href="../sih_2025/index.html" target="_blank" style="color: blue; text-decoration: underline;">
+                https://your-extended-website.com/scan-report
+              </a>
+            </p>
+          </div>
+
+          <!-- Buttons -->
+          <div style="margin-top: 40px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+            <button class="btn btn-secondary" onclick="cleanAnotherDevice()">
+              Clean Another Device
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function cleanAnotherDevice() {
+      sessionStorage.clear();
+      document.querySelector('.page').style.transition = 'all 0.5s ease-out';
+      document.querySelector('.page').style.opacity = '0';
+      document.querySelector('.page').style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 500);
+    }
+  </script>
+</body>
+</html>

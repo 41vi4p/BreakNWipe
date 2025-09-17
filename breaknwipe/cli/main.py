@@ -25,6 +25,13 @@ from .interactive import InteractiveMode
 from .expert import ExpertMode
 from .progress import ProgressDisplay
 
+# Import web server (only when needed to avoid dependency issues)
+try:
+    from ..web import WebServer
+    WEB_AVAILABLE = True
+except ImportError:
+    WEB_AVAILABLE = False
+
 console = Console()
 
 def check_root_privileges():
@@ -47,10 +54,14 @@ def display_banner():
 @click.group(invoke_without_command=True)
 @click.option('--version', is_flag=True, help='Show version information')
 @click.option('--interactive', '-i', is_flag=True, help='Launch interactive mode')
+@click.option('--gui', is_flag=True, help='Launch web GUI interface')
 @click.option('--list-devices', '-l', is_flag=True, help='List available devices')
 @click.option('--verbose', '-v', count=True, help='Increase verbosity level')
+@click.option('--host', default='127.0.0.1', help='Web server host (default: 127.0.0.1)')
+@click.option('--port', default=8000, type=int, help='Web server port (default: 8000)')
+@click.option('--no-browser', is_flag=True, help='Do not automatically open browser')
 @click.pass_context
-def main(ctx, version, interactive, list_devices, verbose):
+def main(ctx, version, interactive, gui, list_devices, verbose, host, port, no_browser):
     """BreakNWipe - Comprehensive secure data wiping utility."""
 
     if version:
@@ -80,6 +91,33 @@ def main(ctx, version, interactive, list_devices, verbose):
 
     if list_devices:
         list_available_devices()
+        return
+
+    if gui:
+        # Launch web GUI mode
+        if not WEB_AVAILABLE:
+            console.print("[red]ERROR:[/red] Web interface dependencies not available.")
+            console.print("Install with: [bold]pip install 'breaknwipe[web]'[/bold]")
+            sys.exit(1)
+
+        console.print(f"[blue]Starting BreakNWipe Web Interface...[/blue]")
+        console.print(f"Server will be available at: [bold]http://{host}:{port}[/bold]")
+
+        if not no_browser:
+            console.print("Opening browser automatically...")
+        else:
+            console.print("Browser auto-open disabled. Open the URL manually.")
+
+        console.print("\n[yellow]Press Ctrl+C to stop the server[/yellow]\n")
+
+        try:
+            web_server = WebServer(host=host, port=port, open_browser=not no_browser)
+            web_server.start()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Server stopped by user[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Error starting web server:[/red] {e}")
+            sys.exit(1)
         return
 
     if interactive or ctx.invoked_subcommand is None:

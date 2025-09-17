@@ -28,3 +28,9 @@ prometheus-client>=0.14.0 # Metrics collection
 
 # Optional Dependencies for Advanced Features
 numpy>=1.21.0             # Numerical computing (for pattern generation)
+
+# Web Interface Dependencies
+fastapi>=0.104.0          # FastAPI web framework
+uvicorn[standard]>=0.24.0 # ASGI server
+websockets>=11.0.0        # WebSocket support
+aiofiles>=23.2.1          # Async file operations
