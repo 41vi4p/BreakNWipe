@@ -30,12 +30,14 @@ class DeviceType(str, Enum):
 
 class WipeAlgorithm(str, Enum):
     """Available wiping algorithms."""
-    ZERO_FILL = "zeroFill"
-    RANDOM_FILL = "randomFill"
-    GUTMANN = "gutmann"
-    DOD = "doD"
     NIST_CLEAR = "nist-clear"
     NIST_PURGE = "nist-purge"
+    DOD_3PASS = "dod-3pass"
+    DOD_7PASS = "dod-7pass"
+    GUTMANN = "gutmann"
+    RANDOM = "random"
+    ZEROS = "zeros"
+    CUSTOM = "custom"
 
 
 class DeviceInfo(BaseModel):

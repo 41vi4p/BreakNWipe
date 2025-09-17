@@ -40,6 +40,7 @@ class WebServer:
         )
         self.session_manager = WipeSessionManager()
         self.websocket_connections: Dict[str, List[WebSocket]] = {}
+        self.event_loop = None
         self._setup_app()
 
     def _setup_app(self):
@@ -62,6 +63,11 @@ class WebServer:
         # Setup routes
         self._setup_routes()
 
+        # Add startup event to capture event loop
+        @self.app.on_event("startup")
+        async def startup_event():
+            self.event_loop = asyncio.get_running_loop()
+
     def _setup_routes(self):
         """Setup API routes."""
 
@@ -72,6 +78,22 @@ class WebServer:
             if frontend_path.exists():
                 return HTMLResponse(content=frontend_path.read_text(), status_code=200)
             return HTMLResponse(content="<h1>BreakNWipe Web Interface</h1><p>Frontend not found</p>")
+
+        @self.app.get("/progress.html", response_class=HTMLResponse)
+        async def progress_page():
+            """Serve the progress page."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "progress.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>Progress Page Not Found</h1>", status_code=404)
+
+        @self.app.get("/qr-report.html", response_class=HTMLResponse)
+        async def qr_report_page():
+            """Serve the QR report page."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "qr-report.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>Report Page Not Found</h1>", status_code=404)
 
         @self.app.get("/api/devices", response_model=List[DeviceInfo])
         async def get_devices():
@@ -107,7 +129,13 @@ class WebServer:
 
                 # Setup WebSocket progress notifications
                 def progress_callback(progress: WipeProgress):
-                    asyncio.create_task(self._broadcast_progress(session_id, progress))
+                    try:
+                        if self.event_loop and not self.event_loop.is_closed():
+                            asyncio.run_coroutine_threadsafe(
+                                self._broadcast_progress(session_id, progress), self.event_loop
+                            )
+                    except Exception as e:
+                        print(f"Failed to broadcast progress: {e}")
 
                 self.session_manager.add_progress_callback(session_id, progress_callback)
 

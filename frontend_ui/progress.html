@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Wipe - Cleaning Progress</title>
+    <title>BreakNWipe by CodeBreakers - Cleaning Progress</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
         <div class="page active" id="progressPage">
             <div class="header">
-                <h1>⚫ Data Wipe</h1>
-                <p>Securely wiping data from your device</p>
+                <h1>⚫ BreakNWipe</h1>
+                <p>by CodeBreakers - Securely wiping data from your device</p>
             </div>
             <div class="content">
                 <div class="progress-header">
@@ -53,6 +53,26 @@
                         <div class="circular-progress">
                             <svg>
                                 <circle class="progress-circle" cx="40" cy="40" r="36"></circle>
+                                <circle class="progress-fill" id="timeElapsedProgress" cx="40" cy="40" r="36"></circle>
+                            </svg>
+                        </div>
+                        <div class="stat-value" id="timeElapsed">00:00:00</div>
+                        <div class="stat-label">Time Elapsed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="circular-progress">
+                            <svg>
+                                <circle class="progress-circle" cx="40" cy="40" r="36"></circle>
+                                <circle class="progress-fill" id="etaProgress" cx="40" cy="40" r="36"></circle>
+                            </svg>
+                        </div>
+                        <div class="stat-value" id="estimatedTime">--:--:--</div>
+                        <div class="stat-label">ETA Remaining</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="circular-progress">
+                            <svg>
+                                <circle class="progress-circle" cx="40" cy="40" r="36"></circle>
                                 <circle class="progress-fill" id="securityProgress" cx="40" cy="40" r="36"></circle>
                             </svg>
                         </div>
@@ -80,6 +100,41 @@
         let selectedDevice = null;
         let selectedAlgorithm = null;
         let currentProgress = 0;
+        let startTime = null;
+        let timeElapsedInterval = null;
+
+        // Time formatting function
+        function formatTime(seconds) {
+            if (!seconds || seconds < 0) return '--:--:--';
+
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Start time elapsed counter
+        function startTimeElapsedCounter() {
+            startTime = Date.now();
+            timeElapsedInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                document.getElementById('timeElapsed').textContent = formatTime(elapsed);
+
+                // Update time elapsed circular progress (based on a reasonable max time, e.g., 3 hours = 10800 seconds)
+                const maxTime = 10800; // 3 hours
+                const timeProgress = Math.min(100, (elapsed / maxTime) * 100);
+                updateCircularProgress('timeElapsedProgress', timeProgress);
+            }, 1000);
+        }
+
+        // Stop time elapsed counter
+        function stopTimeElapsedCounter() {
+            if (timeElapsedInterval) {
+                clearInterval(timeElapsedInterval);
+                timeElapsedInterval = null;
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             sessionId = sessionStorage.getItem('sessionId');
@@ -95,12 +150,14 @@
 
             // Map algorithm to display name
             const algorithmMap = {
-                'zeroFill': 'Zero Fill (1-Pass)',
-                'randomFill': 'Random Fill (1-Pass)',
-                'doD': 'DoD 5220.22-M (3-Pass)',
-                'gutmann': 'Gutmann Method (35-Pass)',
                 'nist-clear': 'NIST Clear (1-Pass)',
-                'nist-purge': 'NIST Purge (3-Pass)'
+                'nist-purge': 'NIST Purge (3-Pass)',
+                'dod-3pass': 'DoD 3-Pass (3-Pass)',
+                'dod-7pass': 'DoD 7-Pass (7-Pass)',
+                'gutmann': 'Gutmann Method (35-Pass)',
+                'random': 'Random Data (3-Pass)',
+                'zeros': 'Zero Fill (1-Pass)',
+                'custom': 'Custom Algorithm (3-Pass)'
             };
 
             document.getElementById('securityLevel').textContent = algorithmMap[selectedAlgorithm] || 'Unknown';
@@ -140,6 +197,11 @@
         function updateProgress(data) {
             currentProgress = data.progress_percent;
 
+            // Start timer on first progress update
+            if (!startTime && data.status === 'running') {
+                startTimeElapsedCounter();
+            }
+
             // Update progress bar
             const progressBar = document.getElementById('progressBar');
             const progressPercent = document.getElementById('progressPercent');
@@ -172,6 +234,31 @@
             const securityProgress = Math.min(100, currentProgress);
             updateCircularProgress('securityProgress', securityProgress);
 
+            // Update ETA if available
+            if (data.estimated_remaining && data.estimated_remaining > 0) {
+                document.getElementById('estimatedTime').textContent = formatTime(data.estimated_remaining);
+
+                // Update ETA circular progress (inverse of remaining time progress)
+                const maxEstimatedTime = 10800; // 3 hours max
+                const etaProgress = Math.max(0, 100 - ((data.estimated_remaining / maxEstimatedTime) * 100));
+                updateCircularProgress('etaProgress', etaProgress);
+            } else if (currentProgress > 0) {
+                // Calculate ETA based on elapsed time and progress
+                if (startTime) {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const estimatedTotal = (elapsed / currentProgress) * 100;
+                    const estimatedRemaining = estimatedTotal - elapsed;
+
+                    if (estimatedRemaining > 0) {
+                        document.getElementById('estimatedTime').textContent = formatTime(estimatedRemaining);
+
+                        const maxEstimatedTime = 10800; // 3 hours max
+                        const etaProgress = Math.max(0, 100 - ((estimatedRemaining / maxEstimatedTime) * 100));
+                        updateCircularProgress('etaProgress', etaProgress);
+                    }
+                }
+            }
+
             // Update status based on progress data
             updateStatus(data.status);
         }
@@ -189,11 +276,17 @@
                     statusIndicator.className = 'status-indicator status-complete';
                     statusText.innerHTML = '<span class="status-indicator status-complete"></span>Operation completed successfully!';
 
-                    // Complete all progress indicators
+                    // Stop timer and complete all progress indicators
+                    stopTimeElapsedCounter();
                     updateCircularProgress('speedProgress', 100);
                     updateCircularProgress('dataProgress', 100);
                     updateCircularProgress('securityProgress', 100);
                     updateCircularProgress('passProgress', 100);
+                    updateCircularProgress('timeElapsedProgress', 100);
+                    updateCircularProgress('etaProgress', 100);
+
+                    // Set final ETA to 00:00:00
+                    document.getElementById('estimatedTime').textContent = '00:00:00';
 
                     // Save completion data and redirect
                     const completionData = {

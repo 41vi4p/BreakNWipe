@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Wipe - Device & Algorithm Selection</title>
+    <title>BreakNWipe by CodeBreakers - Device & Algorithm Selection</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
         <div class="page active" id="deviceSelection">
             <div class="header">
-                <h1>⚫ Data Wipe</h1>
-                <p>Professional Data Cleaning Solution</p>
+                <h1>⚫ BreakNWipe</h1>
+                <p>by CodeBreakers - Professional Data Cleaning Solution</p>
             </div>
             <div class="content">
                 <h2 class="page-title">Select Device to Clean</h2>
@@ -28,28 +28,60 @@
                 <h2 class="page-title">Select Data Wiping Algorithm</h2>
 
                 <div class="device-grid" id="algorithmGrid">
-                    <div class="device-card" data-algo="zeroFill">
+                    <div class="device-card" data-algo="nist-clear" title="Fast and reliable - Recommended for most users">
+                        <div class="device-icon">✅</div>
+                        <h3>NIST Clear</h3>
+                        <p>NIST SP 800-88 Clear (1 pass) - Fast and reliable</p>
+                        <div class="security-level" style="color: #4ecdc4;">⭐ Basic</div>
+                    </div>
+
+                    <div class="device-card" data-algo="zeros" title="Quick wipe with zeros - Fastest option">
                         <div class="device-icon">0️⃣</div>
                         <h3>Zero Fill</h3>
-                        <p>Overwrite data with zeros (fast, basic)</p>
+                        <p>Zero Fill (1 pass) - Quick wipe with zeros</p>
+                        <div class="security-level" style="color: #4ecdc4;">⭐ Basic</div>
                     </div>
 
-                    <div class="device-card" data-algo="randomFill">
+                    <div class="device-card" data-algo="nist-purge" title="Enhanced security - Good balance">
+                        <div class="device-icon">🔒</div>
+                        <h3>NIST Purge</h3>
+                        <p>NIST SP 800-88 Purge (3 passes) - Enhanced security</p>
+                        <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                    </div>
+
+                    <div class="device-card" data-algo="dod-3pass" title="Government standard - Widely accepted">
+                        <div class="device-icon">🇺🇸</div>
+                        <h3>DoD 3-Pass</h3>
+                        <p>DoD 5220.22-M Standard (3 passes) - Government standard</p>
+                        <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                    </div>
+
+                    <div class="device-card" data-algo="random" title="Cryptographically secure random data">
                         <div class="device-icon">🎲</div>
-                        <h3>Random Fill</h3>
-                        <p>Overwrite data with random values (more secure)</p>
+                        <h3>Random Data</h3>
+                        <p>Random Data (3 passes) - Cryptographically secure</p>
+                        <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
                     </div>
 
-                    <div class="device-card" data-algo="gutmann">
+                    <div class="device-card" data-algo="dod-7pass" title="Maximum security - Military grade">
+                        <div class="device-icon">🛡️</div>
+                        <h3>DoD 7-Pass</h3>
+                        <p>DoD 5220.22-M Enhanced (7 passes) - Maximum security</p>
+                        <div class="security-level" style="color: #e74c3c;">⭐⭐⭐ High</div>
+                    </div>
+
+                    <div class="device-card" data-algo="gutmann" title="Ultimate data destruction - Very slow but thorough">
                         <div class="device-icon">🌀</div>
                         <h3>Gutmann Method</h3>
-                        <p>35-pass method for high security</p>
+                        <p>Gutmann Method (35 passes) - Ultimate data destruction</p>
+                        <div class="security-level" style="color: #e74c3c;">⭐⭐⭐ Extreme</div>
                     </div>
 
-                    <div class="device-card" data-algo="doD">
-                        <div class="device-icon">🇺🇸</div>
-                        <h3>DoD 5220.22-M</h3>
-                        <p>3-pass US Department of Defense standard</p>
+                    <div class="device-card" data-algo="custom" title="For advanced users - Configurable">
+                        <div class="device-icon">⚙️</div>
+                        <h3>Custom</h3>
+                        <p>Custom Algorithm (3 passes) - Advanced users</p>
+                        <div class="security-level" style="color: #9b59b6;">⚙️ Advanced</div>
                     </div>
                 </div>
 

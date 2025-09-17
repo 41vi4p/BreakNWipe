@@ -157,12 +157,14 @@ class WipeSessionManager:
     def _get_total_passes(self, algorithm: WipeAlgorithm) -> int:
         """Get total number of passes for an algorithm."""
         algorithm_passes = {
-            WipeAlgorithm.ZERO_FILL: 1,
-            WipeAlgorithm.RANDOM_FILL: 1,
-            WipeAlgorithm.DOD: 3,
-            WipeAlgorithm.GUTMANN: 35,
             WipeAlgorithm.NIST_CLEAR: 1,
-            WipeAlgorithm.NIST_PURGE: 3
+            WipeAlgorithm.NIST_PURGE: 3,
+            WipeAlgorithm.DOD_3PASS: 3,
+            WipeAlgorithm.DOD_7PASS: 7,
+            WipeAlgorithm.GUTMANN: 35,
+            WipeAlgorithm.RANDOM: 3,
+            WipeAlgorithm.ZEROS: 1,
+            WipeAlgorithm.CUSTOM: 3
         }
         return algorithm_passes.get(algorithm, 3)
 
@@ -176,52 +178,49 @@ class WipeSessionManager:
             session.progress.last_updated = datetime.now()
             self._notify_progress_callbacks(session_id)
 
+            # Setup progress callback
+            def progress_callback(progress):
+                # Convert engine progress to session progress
+                session.progress.current_pass = progress.current_pass
+                session.progress.total_passes = progress.total_passes
+                session.progress.progress_percent = progress.overall_progress * 100
+                session.progress.speed_mbps = progress.current_speed_mbps
+                session.progress.data_processed = progress.bytes_written
+                session.progress.last_updated = datetime.now()
+
+                # Estimate remaining time
+                if progress.eta_seconds > 0:
+                    session.progress.estimated_remaining = progress.eta_seconds
+
+                self._notify_progress_callbacks(session_id)
+                return session.progress.status != WipeSessionStatus.CANCELLED
+
             # Create wipe engine and algorithm
-            engine = WipeEngine()
+            engine = WipeEngine(progress_callback=progress_callback)
 
             # Map algorithm names
             algorithm_mapping = {
-                WipeAlgorithm.ZERO_FILL: 'zeros',
-                WipeAlgorithm.RANDOM_FILL: 'random',
-                WipeAlgorithm.DOD: 'dod-3pass',
-                WipeAlgorithm.GUTMANN: 'gutmann',
                 WipeAlgorithm.NIST_CLEAR: 'nist-clear',
-                WipeAlgorithm.NIST_PURGE: 'nist-purge'
+                WipeAlgorithm.NIST_PURGE: 'nist-purge',
+                WipeAlgorithm.DOD_3PASS: 'dod-3pass',
+                WipeAlgorithm.DOD_7PASS: 'dod-7pass',
+                WipeAlgorithm.GUTMANN: 'gutmann',
+                WipeAlgorithm.RANDOM: 'random',
+                WipeAlgorithm.ZEROS: 'zeros',
+                WipeAlgorithm.CUSTOM: 'custom'
             }
 
             algorithm_name = algorithm_mapping.get(session.wipe_request.algorithm, 'nist-clear')
             algorithm = create_algorithm(algorithm_name)
 
-            # Create device handler
-            device_handler = DeviceHandler(session.device_info.path)
-
-            # Setup progress callback
-            def progress_callback(pass_num, total_passes, progress_percent, speed_mbps, data_processed):
-                if session.progress.status == WipeSessionStatus.CANCELLED:
-                    return False  # Signal to stop
-
-                session.progress.current_pass = pass_num
-                session.progress.total_passes = total_passes
-                session.progress.progress_percent = progress_percent
-                session.progress.speed_mbps = speed_mbps
-                session.progress.data_processed = data_processed
-                session.progress.last_updated = datetime.now()
-
-                # Estimate remaining time
-                if speed_mbps > 0 and progress_percent > 0:
-                    remaining_data = session.device_info.capacity * (100 - progress_percent) / 100
-                    remaining_time = remaining_data / (speed_mbps * 1024 * 1024)
-                    session.progress.estimated_remaining = int(remaining_time)
-
-                self._notify_progress_callbacks(session_id)
-                return True  # Continue
+            # Create device handler (for hardware operations if needed)
+            device_handler = DeviceHandler()
 
             # Execute wipe
             result = engine.wipe_device(
-                device_handler=device_handler,
+                device_path=session.device_info.path,
                 algorithm=algorithm,
-                verify=session.wipe_request.verify,
-                progress_callback=progress_callback
+                verify=session.wipe_request.verify
             )
 
             if session.progress.status == WipeSessionStatus.CANCELLED:
