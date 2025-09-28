@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -262,7 +262,7 @@ class WebServer:
                 },
                 "certificate_path": getattr(session, 'certificate_path', None),
                 "qr_data": getattr(session, 'qr_data', None),
-                "report_id": f"BNW-{session_id[:8]}-{int(time.time())}"
+                "report_id": getattr(session, 'report_id', f"BNW-{session_id[:8]}-{int(time.time())}")
             }
 
             return report_data
@@ -306,20 +306,15 @@ class WebServer:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
-        @self.app.get("/api/logs/{session_id}")
-        async def get_log_by_session(session_id: str):
-            """Get a specific log by session ID."""
+        @self.app.get("/api/logs/statistics")
+        async def get_log_statistics():
+            """Get logging statistics."""
             try:
-                log = self.session_manager.logger.get_log_by_session(session_id)
-                if not log:
-                    raise HTTPException(status_code=404, detail="Log not found")
-
+                stats = self.session_manager.logger.get_statistics()
                 return {
                     "success": True,
-                    "data": log
+                    "data": stats
                 }
-            except HTTPException:
-                raise
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
@@ -332,18 +327,6 @@ class WebServer:
                     "success": True,
                     "data": logs,
                     "total": len(logs)
-                }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
-        @self.app.get("/api/logs/statistics")
-        async def get_log_statistics():
-            """Get logging statistics."""
-            try:
-                stats = self.session_manager.logger.get_statistics()
-                return {
-                    "success": True,
-                    "data": stats
                 }
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
@@ -369,6 +352,82 @@ class WebServer:
                     "success": True,
                     "data": audit_events
                 }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/logs/{session_id}")
+        async def get_log_by_session(session_id: str):
+            """Get a specific log by session ID."""
+            try:
+                log = self.session_manager.logger.get_log_by_session(session_id)
+                if not log:
+                    raise HTTPException(status_code=404, detail="Log not found")
+
+                return {
+                    "success": True,
+                    "data": log
+                }
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        # Log deletion endpoints
+        @self.app.delete("/api/logs/{session_id}")
+        async def delete_log(session_id: str):
+            """Delete a specific log entry."""
+            try:
+                success = self.session_manager.logger.delete_log(session_id)
+                if not success:
+                    raise HTTPException(status_code=404, detail="Log not found")
+                return {
+                    "success": True,
+                    "message": "Log deleted successfully"
+                }
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.delete("/api/logs")
+        async def delete_multiple_logs(request: Request):
+            """Delete multiple log entries."""
+            try:
+                # Get session IDs from request body
+                body = await request.json()
+                session_ids = body if isinstance(body, list) else []
+
+                if not session_ids:
+                    raise HTTPException(status_code=400, detail="No session IDs provided")
+
+                deleted_count = self.session_manager.logger.delete_multiple_logs(session_ids)
+                return {
+                    "success": True,
+                    "message": f"Deleted {deleted_count} log entries",
+                    "deleted_count": deleted_count,
+                    "requested_count": len(session_ids)
+                }
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.delete("/api/logs/cleanup")
+        async def cleanup_old_logs(days_old: int = 90):
+            """Delete logs older than specified number of days."""
+            try:
+                if days_old < 1:
+                    raise HTTPException(status_code=400, detail="days_old must be at least 1")
+
+                deleted_count = self.session_manager.logger.delete_old_logs(days_old)
+                return {
+                    "success": True,
+                    "message": f"Cleaned up {deleted_count} old log entries",
+                    "deleted_count": deleted_count,
+                    "criteria": f"Logs older than {days_old} days"
+                }
+            except HTTPException:
+                raise
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 

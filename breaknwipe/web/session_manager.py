@@ -274,6 +274,10 @@ class WipeSessionManager:
             if session.progress.status == WipeSessionStatus.CANCELLED:
                 return
 
+            # Generate report ID once and store it in the session
+            if not hasattr(session, 'report_id') or not session.report_id:
+                session.report_id = f"BNW-{session_id[:8]}-{int(time.time())}"
+
             # Generate certificate if requested
             if session.wipe_request.generate_certificate and result.success:
                 try:
@@ -292,6 +296,7 @@ class WipeSessionManager:
                     )
 
                     wipe_report = WipeReport(
+                        report_id=session.report_id,  # Use the consistent report ID
                         device_info=report_device_info,
                         algorithm_used=result.algorithm_used,
                         wipe_method="software",
@@ -397,12 +402,11 @@ class WipeSessionManager:
                     'average_speed_mbps': result.average_speed_mbps,
                     'error_message': getattr(result, 'error_message', None)
                 }
-                report_id = f"BNW-{session_id[:8]}-{int(time.time())}"
                 self.logger.log_wipe_completed(
                     session_id,
                     result_data,
                     getattr(session, 'certificate_path', None),
-                    report_id
+                    session.report_id
                 )
             except Exception as e:
                 print(f"Failed to log wipe completion: {e}")

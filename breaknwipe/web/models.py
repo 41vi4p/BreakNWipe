@@ -115,6 +115,7 @@ class WipeSession(BaseModel):
     progress: WipeProgress = Field(..., description="Current progress")
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     certificate_path: Optional[str] = Field(default=None, description="Path to generated certificate")
+    report_id: Optional[str] = Field(default=None, description="Generated report ID for consistency")
 
 
 class ApiResponse(BaseModel):

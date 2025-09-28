@@ -262,35 +262,58 @@ class WipeLoggingService:
         Returns:
             Dictionary with various statistics
         """
-        stats = self.db.get_statistics()
+        try:
+            stats = self.db.get_statistics()
+            logger.debug(f"Database statistics: {stats}")
 
-        # Add additional computed statistics
-        logs = self.db.get_wipe_logs(limit=1000)
+            # Add additional computed statistics
+            logs = self.db.get_wipe_logs(limit=1000)
+            logger.debug(f"Retrieved {len(logs)} logs for statistics calculation")
 
-        # Calculate success rate
-        completed_logs = [log for log in logs if log['operation_status'] == 'completed']
-        failed_logs = [log for log in logs if log['operation_status'] == 'failed']
-        total_completed_or_failed = len(completed_logs) + len(failed_logs)
+            # Calculate success rate
+            completed_logs = [log for log in logs if log.get('operation_status') == 'completed']
+            failed_logs = [log for log in logs if log.get('operation_status') == 'failed']
+            total_completed_or_failed = len(completed_logs) + len(failed_logs)
 
-        if total_completed_or_failed > 0:
-            stats['success_rate'] = (len(completed_logs) / total_completed_or_failed) * 100
-        else:
-            stats['success_rate'] = 0
+            if total_completed_or_failed > 0:
+                stats['success_rate'] = (len(completed_logs) / total_completed_or_failed) * 100
+            else:
+                stats['success_rate'] = 0
 
-        # Calculate average operation time
-        completed_with_duration = [log for log in completed_logs if log['duration_seconds']]
-        if completed_with_duration:
-            avg_duration = sum(log['duration_seconds'] for log in completed_with_duration) / len(completed_with_duration)
-            stats['average_duration_seconds'] = int(avg_duration)
-        else:
-            stats['average_duration_seconds'] = 0
+            # Calculate average operation time
+            completed_with_duration = [log for log in completed_logs if log.get('duration_seconds')]
+            if completed_with_duration:
+                avg_duration = sum(log['duration_seconds'] for log in completed_with_duration) / len(completed_with_duration)
+                stats['average_duration_seconds'] = int(avg_duration)
+            else:
+                stats['average_duration_seconds'] = 0
 
-        # Calculate total data processed
-        stats['total_data_processed_bytes'] = sum(
-            log['data_processed_bytes'] or 0 for log in logs
-        )
+            # Calculate total data processed
+            stats['total_data_processed_bytes'] = sum(
+                log.get('data_processed_bytes', 0) or 0 for log in logs
+            )
 
-        return stats
+            # Ensure all required fields exist with defaults
+            stats.setdefault('total_operations', 0)
+            stats.setdefault('total_devices', 0)
+            stats.setdefault('success_rate', 0)
+            stats.setdefault('average_duration_seconds', 0)
+
+            logger.info(f"Statistics calculated: {stats}")
+            return stats
+
+        except Exception as e:
+            logger.error(f"Error calculating statistics: {e}")
+            # Return default statistics on error
+            return {
+                'total_operations': 0,
+                'total_devices': 0,
+                'success_rate': 0,
+                'average_duration_seconds': 0,
+                'total_data_processed_bytes': 0,
+                'operations_by_status': {},
+                'recent_operations': 0
+            }
 
     def search_logs(self, search_term: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
@@ -428,3 +451,75 @@ class WipeLoggingService:
             List of report dictionaries for the device
         """
         return self.db.get_wipe_reports(device_path=device_path, limit=1000)
+
+    def delete_log(self, session_id: str) -> bool:
+        """
+        Delete a single wipe log entry.
+
+        Args:
+            session_id: Session ID of the log to delete
+
+        Returns:
+            True if deletion was successful
+        """
+        logger.info(f"Deleting log entry: session_id={session_id}")
+
+        # Add audit event before deletion
+        self.db.add_audit_event(
+            session_id=session_id,
+            event_type='log_deleted',
+            description='Log entry manually deleted',
+            event_data={'deleted_by': 'user'}
+        )
+
+        result = self.db.delete_wipe_log(session_id)
+        if result:
+            logger.info(f"Successfully deleted log: session_id={session_id}")
+        else:
+            logger.warning(f"Failed to delete log: session_id={session_id}")
+
+        return result
+
+    def delete_multiple_logs(self, session_ids: List[str]) -> int:
+        """
+        Delete multiple wipe log entries.
+
+        Args:
+            session_ids: List of session IDs to delete
+
+        Returns:
+            Number of logs successfully deleted
+        """
+        if not session_ids:
+            return 0
+
+        logger.info(f"Deleting {len(session_ids)} log entries")
+
+        # Add audit events before deletion
+        for session_id in session_ids:
+            self.db.add_audit_event(
+                session_id=session_id,
+                event_type='log_deleted',
+                description='Log entry bulk deleted',
+                event_data={'deleted_by': 'user', 'bulk_operation': True}
+            )
+
+        result = self.db.delete_multiple_wipe_logs(session_ids)
+        logger.info(f"Successfully deleted {result} log entries out of {len(session_ids)} requested")
+
+        return result
+
+    def delete_old_logs(self, days_old: int = 90) -> int:
+        """
+        Delete logs older than specified number of days.
+
+        Args:
+            days_old: Number of days - logs older than this will be deleted
+
+        Returns:
+            Number of logs deleted
+        """
+        logger.info(f"Cleaning up logs older than {days_old} days")
+        result = self.db.delete_old_logs(days_old)
+        logger.info(f"Cleaned up {result} old log entries")
+        return result

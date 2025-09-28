@@ -445,36 +445,63 @@ class LoggingDatabase:
         Returns:
             Dictionary with various statistics
         """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
 
-            stats = {}
+                stats = {}
 
-            # Total operations
-            cursor = conn.execute("SELECT COUNT(*) as total FROM wipe_logs")
-            stats['total_operations'] = cursor.fetchone()[0]
+                # Total operations
+                try:
+                    cursor = conn.execute("SELECT COUNT(*) as total FROM wipe_logs")
+                    stats['total_operations'] = cursor.fetchone()[0] or 0
+                except Exception as e:
+                    logger.error(f"Error getting total operations: {e}")
+                    stats['total_operations'] = 0
 
-            # Operations by status
-            cursor = conn.execute("""
-                SELECT operation_status, COUNT(*) as count
-                FROM wipe_logs
-                GROUP BY operation_status
-            """)
-            stats['operations_by_status'] = {row[0]: row[1] for row in cursor.fetchall()}
+                # Operations by status
+                try:
+                    cursor = conn.execute("""
+                        SELECT operation_status, COUNT(*) as count
+                        FROM wipe_logs
+                        GROUP BY operation_status
+                    """)
+                    stats['operations_by_status'] = {row[0]: row[1] for row in cursor.fetchall()}
+                except Exception as e:
+                    logger.error(f"Error getting operations by status: {e}")
+                    stats['operations_by_status'] = {}
 
-            # Total devices
-            cursor = conn.execute("SELECT COUNT(*) as total FROM device_history")
-            stats['total_devices'] = cursor.fetchone()[0]
+                # Total devices
+                try:
+                    cursor = conn.execute("SELECT COUNT(*) as total FROM device_history")
+                    stats['total_devices'] = cursor.fetchone()[0] or 0
+                except Exception as e:
+                    logger.error(f"Error getting total devices: {e}")
+                    stats['total_devices'] = 0
 
-            # Recent activity (last 30 days)
-            cursor = conn.execute("""
-                SELECT COUNT(*) as count
-                FROM wipe_logs
-                WHERE created_at >= datetime('now', '-30 days')
-            """)
-            stats['recent_operations'] = cursor.fetchone()[0]
+                # Recent activity (last 30 days)
+                try:
+                    cursor = conn.execute("""
+                        SELECT COUNT(*) as count
+                        FROM wipe_logs
+                        WHERE created_at >= datetime('now', '-30 days')
+                    """)
+                    stats['recent_operations'] = cursor.fetchone()[0] or 0
+                except Exception as e:
+                    logger.error(f"Error getting recent operations: {e}")
+                    stats['recent_operations'] = 0
 
-            return stats
+                return stats
+
+        except Exception as e:
+            logger.error(f"Error connecting to database for statistics: {e}")
+            # Return default values if database connection fails
+            return {
+                'total_operations': 0,
+                'total_devices': 0,
+                'operations_by_status': {},
+                'recent_operations': 0
+            }
 
     def add_wipe_report(self, report_data: Dict[str, Any]) -> int:
         """
@@ -602,3 +629,93 @@ class LoggingDatabase:
             )
 
             return cursor.rowcount > 0
+
+    def delete_wipe_log(self, session_id: str) -> bool:
+        """
+        Delete a wipe log entry and related data.
+
+        Args:
+            session_id: Session ID of the log to delete
+
+        Returns:
+            True if deletion was successful
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            # Delete from wipe_reports first (due to foreign key constraint)
+            conn.execute("DELETE FROM wipe_reports WHERE session_id = ?", (session_id,))
+
+            # Delete from audit_trail
+            conn.execute("DELETE FROM audit_trail WHERE session_id = ?", (session_id,))
+
+            # Delete from wipe_logs
+            cursor = conn.execute("DELETE FROM wipe_logs WHERE session_id = ?", (session_id,))
+
+            return cursor.rowcount > 0
+
+    def delete_multiple_wipe_logs(self, session_ids: List[str]) -> int:
+        """
+        Delete multiple wipe log entries.
+
+        Args:
+            session_ids: List of session IDs to delete
+
+        Returns:
+            Number of logs successfully deleted
+        """
+        if not session_ids:
+            return 0
+
+        with sqlite3.connect(self.db_path) as conn:
+            deleted_count = 0
+            placeholders = ','.join(['?' for _ in session_ids])
+
+            # Delete from wipe_reports first
+            conn.execute(f"DELETE FROM wipe_reports WHERE session_id IN ({placeholders})", session_ids)
+
+            # Delete from audit_trail
+            conn.execute(f"DELETE FROM audit_trail WHERE session_id IN ({placeholders})", session_ids)
+
+            # Delete from wipe_logs and count affected rows
+            cursor = conn.execute(f"DELETE FROM wipe_logs WHERE session_id IN ({placeholders})", session_ids)
+            deleted_count = cursor.rowcount
+
+            return deleted_count
+
+    def delete_device_history(self, device_path: str) -> bool:
+        """
+        Delete device history entry.
+
+        Args:
+            device_path: Device path to delete from history
+
+        Returns:
+            True if deletion was successful
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("DELETE FROM device_history WHERE device_path = ?", (device_path,))
+            return cursor.rowcount > 0
+
+    def delete_old_logs(self, days_old: int = 90) -> int:
+        """
+        Delete logs older than specified number of days.
+
+        Args:
+            days_old: Number of days - logs older than this will be deleted
+
+        Returns:
+            Number of logs deleted
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            # Get session IDs of logs to be deleted
+            cursor = conn.execute("""
+                SELECT session_id FROM wipe_logs
+                WHERE created_at < datetime('now', '-{} days')
+            """.format(days_old))
+
+            session_ids = [row[0] for row in cursor.fetchall()]
+
+            if not session_ids:
+                return 0
+
+            # Use the multiple delete method
+            return self.delete_multiple_wipe_logs(session_ids)
