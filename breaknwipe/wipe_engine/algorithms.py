@@ -26,6 +26,12 @@ class AlgorithmType(Enum):
     ZEROS = "zeros"
     CUSTOM = "custom"
 
+    # New Cryptographic Erase Algorithms (REA - Randomized Encryption Algorithm)
+    REA_BASIC = "rea-basic"
+    REA_MULTICHAIN = "rea-multichain"
+    REA_EXTREME = "rea-extreme"
+    REA_CUSTOM = "rea-custom"
+
 
 @dataclass
 class WipePass:
@@ -68,6 +74,14 @@ class WipeAlgorithm:
             self._setup_random()
         elif self.algorithm_type == AlgorithmType.ZEROS:
             self._setup_zeros()
+        elif self.algorithm_type == AlgorithmType.REA_BASIC:
+            self._setup_rea_basic()
+        elif self.algorithm_type == AlgorithmType.REA_MULTICHAIN:
+            self._setup_rea_multichain()
+        elif self.algorithm_type == AlgorithmType.REA_EXTREME:
+            self._setup_rea_extreme()
+        elif self.algorithm_type == AlgorithmType.REA_CUSTOM:
+            self._setup_rea_custom()
 
     def _setup_nist_clear(self):
         """Setup NIST SP 800-88 Clear method (single pass)."""
@@ -157,6 +171,114 @@ class WipeAlgorithm:
             WipePass(1, b'\\x00' * self.block_size, "Zero Fill")
         ]
 
+    def _setup_rea_basic(self):
+        """Setup REA Basic - Randomized Encryption Algorithm with basic overwrite."""
+        self._passes = [
+            WipePass(1, self._generate_rea_pattern(), "REA Phase 1 - Master Key Generation"),
+            WipePass(2, self._generate_rea_pattern(), "REA Phase 2 - Primary Encryption Pass"),
+            WipePass(3, self._generate_rea_pattern(), "REA Phase 3 - Randomized Encryption"),
+            WipePass(4, b'\\x00' * self.block_size, "REA Phase 4 - NIST Clear Overwrite"),
+            WipePass(5, self._generate_random_block(), "REA Phase 5 - Final Random Pass")
+        ]
+
+    def _setup_rea_multichain(self):
+        """Setup REA Multichain - Multi-layer encryption with DoD overwrite."""
+        self._passes = [
+            WipePass(1, self._generate_rea_pattern(), "REA-MC Phase 1 - Chain Key Generation"),
+            WipePass(2, self._generate_rea_pattern(), "REA-MC Phase 2 - Primary Chain Encryption"),
+            WipePass(3, self._generate_rea_pattern(), "REA-MC Phase 3 - Secondary Chain Encryption"),
+            WipePass(4, self._generate_rea_pattern(), "REA-MC Phase 4 - Tertiary Chain Encryption"),
+            WipePass(5, self._generate_rea_pattern(), "REA-MC Phase 5 - Final Randomized Layer"),
+            WipePass(6, b'\\x00' * self.block_size, "REA-MC Phase 6 - DoD Zero Pass"),
+            WipePass(7, b'\\xFF' * self.block_size, "REA-MC Phase 7 - DoD Ones Pass"),
+            WipePass(8, self._generate_random_block(), "REA-MC Phase 8 - DoD Random Pass", verify=True)
+        ]
+
+    def _setup_rea_extreme(self):
+        """Setup REA Extreme - Maximum encryption with Gutmann overwrite."""
+        # Multi-chain encryption phase
+        encryption_passes = []
+        for i in range(1, 8):
+            encryption_passes.append(
+                WipePass(i, self._generate_rea_pattern(), f"REA-EX Phase {i} - Encryption Layer {i}")
+            )
+
+        # Gutmann-style overwrite patterns for ultimate security
+        gutmann_patterns = [
+            b'\\x55', b'\\xAA', b'\\x92\\x49\\x24', b'\\x49\\x24\\x92',
+            b'\\x24\\x92\\x49', b'\\x00', b'\\x11', b'\\x22', b'\\x33',
+            b'\\x44', b'\\x55', b'\\x66', b'\\x77', b'\\x88', b'\\x99',
+            b'\\xAA', b'\\xBB', b'\\xCC', b'\\xDD', b'\\xEE', b'\\xFF'
+        ]
+
+        overwrite_passes = []
+        for i, pattern in enumerate(gutmann_patterns, 8):
+            repeated_pattern = pattern * (self.block_size // len(pattern) + 1)
+            overwrite_passes.append(
+                WipePass(i, repeated_pattern[:self.block_size],
+                        f"REA-EX Phase {i} - Overwrite Pattern {pattern.hex()}")
+            )
+
+        # Final random passes
+        for i in range(30, 33):
+            overwrite_passes.append(
+                WipePass(i, self._generate_random_block(),
+                        f"REA-EX Phase {i} - Final Random Pass")
+            )
+
+        self._passes = encryption_passes + overwrite_passes
+
+    def _setup_rea_custom(self):
+        """Setup REA Custom - User-configurable encryption and overwrite."""
+        # Default custom configuration - can be modified by user
+        self._passes = [
+            WipePass(1, self._generate_rea_pattern(), "REA-Custom Phase 1 - Key Generation"),
+            WipePass(2, self._generate_rea_pattern(), "REA-Custom Phase 2 - Primary Encryption"),
+            WipePass(3, self._generate_rea_pattern(), "REA-Custom Phase 3 - Secondary Encryption"),
+            WipePass(4, self._generate_random_block(), "REA-Custom Phase 4 - Random Overwrite"),
+            WipePass(5, b'\\x00' * self.block_size, "REA-Custom Phase 5 - Zero Overwrite"),
+            WipePass(6, self._generate_random_block(), "REA-Custom Phase 6 - Final Random", verify=True)
+        ]
+
+    def _generate_rea_pattern(self) -> bytes:
+        """
+        Generate a Randomized Encryption Algorithm pattern.
+
+        This simulates the REA process by creating cryptographically secure
+        random data with additional entropy sources and key rotation.
+        """
+        import hashlib
+        import time
+
+        # Generate base random data
+        base_random = os.urandom(self.block_size)
+
+        # Add temporal entropy
+        timestamp = str(time.time_ns()).encode()
+
+        # Create hash-based key rotation
+        hasher = hashlib.sha256()
+        hasher.update(base_random)
+        hasher.update(timestamp)
+        hasher.update(os.urandom(32))  # Additional entropy
+
+        key_material = hasher.digest()
+
+        # XOR the base random data with rotated key material for enhanced randomization
+        result = bytearray(base_random)
+        for i in range(len(result)):
+            key_byte = key_material[i % len(key_material)]
+            result[i] ^= key_byte
+
+        # Add additional randomization layer
+        for i in range(0, len(result), 64):
+            chunk_random = os.urandom(min(64, len(result) - i))
+            for j, byte_val in enumerate(chunk_random):
+                if i + j < len(result):
+                    result[i + j] ^= byte_val
+
+        return bytes(result)
+
     def _generate_random_block(self) -> bytes:
         """Generate a block of cryptographically secure random data."""
         return os.urandom(self.block_size)
@@ -179,7 +301,11 @@ class WipeAlgorithm:
             AlgorithmType.GUTMANN: "Gutmann Method (35 passes)",
             AlgorithmType.RANDOM: f"Random Data ({len(self._passes)} passes)",
             AlgorithmType.ZEROS: "Zero Fill (1 pass)",
-            AlgorithmType.CUSTOM: f"Custom Algorithm ({len(self._passes)} passes)"
+            AlgorithmType.CUSTOM: f"Custom Algorithm ({len(self._passes)} passes)",
+            AlgorithmType.REA_BASIC: f"REA Basic - Encryption + NIST Clear ({len(self._passes)} passes)",
+            AlgorithmType.REA_MULTICHAIN: f"REA Multichain - Multi-layer Encryption + DoD ({len(self._passes)} passes)",
+            AlgorithmType.REA_EXTREME: f"REA Extreme - Maximum Encryption + Gutmann ({len(self._passes)} passes)",
+            AlgorithmType.REA_CUSTOM: f"REA Custom - Configurable Encryption ({len(self._passes)} passes)"
         }
         return descriptions.get(self.algorithm_type, "Unknown Algorithm")
 
@@ -194,7 +320,11 @@ class WipeAlgorithm:
             AlgorithmType.GUTMANN: False,    # Designed for HDDs
             AlgorithmType.RANDOM: True,      # Depends on pass count
             AlgorithmType.ZEROS: True,
-            AlgorithmType.CUSTOM: True       # User responsibility
+            AlgorithmType.CUSTOM: True,      # User responsibility
+            AlgorithmType.REA_BASIC: True,   # Encryption + few passes
+            AlgorithmType.REA_MULTICHAIN: True,  # Reasonable pass count
+            AlgorithmType.REA_EXTREME: False,    # Too many passes for SSD
+            AlgorithmType.REA_CUSTOM: True       # User responsibility
         }
         return secure_for_ssd.get(self.algorithm_type, False)
 
@@ -297,6 +427,10 @@ def _get_algorithm_category(algo_type: AlgorithmType) -> str:
         AlgorithmType.GUTMANN: "Academic Research",
         AlgorithmType.RANDOM: "General Purpose",
         AlgorithmType.ZEROS: "Quick Wipe",
-        AlgorithmType.CUSTOM: "User Defined"
+        AlgorithmType.CUSTOM: "User Defined",
+        AlgorithmType.REA_BASIC: "Cryptographic Erase",
+        AlgorithmType.REA_MULTICHAIN: "Cryptographic Erase",
+        AlgorithmType.REA_EXTREME: "Cryptographic Erase",
+        AlgorithmType.REA_CUSTOM: "Cryptographic Erase"
     }
     return categories.get(algo_type, "Unknown")

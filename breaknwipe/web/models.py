@@ -39,6 +39,27 @@ class WipeAlgorithm(str, Enum):
     ZEROS = "zeros"
     CUSTOM = "custom"
 
+    # Cryptographic Erase Algorithms (REA)
+    REA_BASIC = "rea-basic"
+    REA_MULTICHAIN = "rea-multichain"
+    REA_EXTREME = "rea-extreme"
+    REA_CUSTOM = "rea-custom"
+
+
+class WipeMode(str, Enum):
+    """Wipe mode selection."""
+    QUICK = "quick"
+    DEEP = "deep"
+    ADVANCED = "advanced"
+
+
+class MobileWipeMode(str, Enum):
+    """Mobile device wipe modes."""
+    EDL = "edl"
+    SP_FLASH = "spflash"
+    ODIN = "odin"
+    ADB = "adb"
+
 
 class DeviceInfo(BaseModel):
     """Information about a storage device."""
@@ -60,6 +81,16 @@ class WipeRequest(BaseModel):
     verify: bool = Field(default=True, description="Verify wipe completion")
     generate_certificate: bool = Field(default=True, description="Generate wipe certificate")
     passes: Optional[int] = Field(default=None, description="Number of passes for custom algorithms")
+    wipe_mode: Optional[WipeMode] = Field(default=WipeMode.QUICK, description="Wipe mode selection")
+    custom_passes: Optional[int] = Field(default=None, description="Custom number of passes")
+
+
+class MobileWipeRequest(BaseModel):
+    """Request to start a mobile device wipe operation."""
+    device_id: str = Field(..., description="Mobile device identifier")
+    wipe_mode: MobileWipeMode = Field(..., description="Mobile wipe mode")
+    verify: bool = Field(default=True, description="Verify wipe completion")
+    generate_certificate: bool = Field(default=True, description="Generate wipe certificate")
 
 
 class WipeProgress(BaseModel):

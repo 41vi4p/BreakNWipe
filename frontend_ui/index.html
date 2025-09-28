@@ -23,74 +23,253 @@
                 </div>
             </div>
             <div class="content">
-                <h2 class="page-title">Select Device to Clean</h2>
-                
-                <div class="device-grid">
-                    <!-- Devices will be loaded dynamically from API -->
-                    <div style="color: #ccc; text-align: center; grid-column: 1/-1; padding: 40px;">
-                        <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
-                        <p>Loading available devices...</p>
+                <!-- Device Type Selection -->
+                <h2 class="page-title">Select Device Type</h2>
+
+                <div class="device-type-grid">
+                    <div class="device-type-card" data-type="storage" title="Hard drives, SSDs, USB drives">
+                        <div class="device-icon">💾</div>
+                        <h3>Storage Devices</h3>
+                        <p>HDDs, SSDs, USB drives, memory cards</p>
+                    </div>
+
+                    <div class="device-type-card" data-type="mobile" title="Android phones and tablets">
+                        <div class="device-icon">📱</div>
+                        <h3>Mobile Devices</h3>
+                        <p>Android phones, tablets (EDL, SP Flash, Odin)</p>
                     </div>
                 </div>
 
-                <!-- Algorithm Selection -->
-                <h2 class="page-title">Select Data Wiping Algorithm</h2>
+                <!-- Storage Devices Section -->
+                <div id="storageDevicesSection" class="device-section" style="display: none;">
+                    <h2 class="page-title">Select Storage Device to Clean</h2>
 
-                <div class="device-grid" id="algorithmGrid">
-                    <div class="device-card" data-algo="nist-clear" title="Fast and reliable - Recommended for most users">
-                        <div class="device-icon">✅</div>
-                        <h3>NIST Clear</h3>
-                        <p>NIST SP 800-88 Clear (1 pass) - Fast and reliable</p>
-                        <div class="security-level" style="color: #4ecdc4;">⭐ Basic</div>
+                    <div class="device-grid" id="storageDeviceGrid">
+                        <div style="color: #ccc; text-align: center; grid-column: 1/-1; padding: 40px;">
+                            <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
+                            <p>Loading available storage devices...</p>
+                        </div>
                     </div>
 
-                    <div class="device-card" data-algo="zeros" title="Quick wipe with zeros - Fastest option">
-                        <div class="device-icon">0️⃣</div>
-                        <h3>Zero Fill</h3>
-                        <p>Zero Fill (1 pass) - Quick wipe with zeros</p>
-                        <div class="security-level" style="color: #4ecdc4;">⭐ Basic</div>
+                    <!-- Wipe Mode Selection -->
+                    <h2 class="page-title">Select Wiping Mode</h2>
+
+                    <div class="wipe-mode-grid">
+                        <div class="wipe-mode-card" data-mode="quick" title="Fast wiping with standard algorithms">
+                            <div class="device-icon">⚡</div>
+                            <h3>Quick Wipe</h3>
+                            <p>Fast overwriting with standard algorithms</p>
+                            <div class="mode-features">
+                                <span>✓ 8 Standard Algorithms</span>
+                                <span>✓ 1-7 Pass Options</span>
+                                <span>✓ Fast & Efficient</span>
+                            </div>
+                        </div>
+
+                        <div class="wipe-mode-card" data-mode="deep" title="Maximum security with encryption + overwriting">
+                            <div class="device-icon">🔐</div>
+                            <h3>Deep Wipe</h3>
+                            <p>Encryption + overwriting for maximum security</p>
+                            <div class="mode-features">
+                                <span>✓ Randomized Encryption Algorithm</span>
+                                <span>✓ Multichain Encryption</span>
+                                <span>✓ Ultimate Security</span>
+                            </div>
+                        </div>
+
+                        <div class="wipe-mode-card" data-mode="advanced" title="Manual algorithm selection and configuration">
+                            <div class="device-icon">⚙️</div>
+                            <h3>Advanced Mode</h3>
+                            <p>Manual algorithm selection and custom settings</p>
+                            <div class="mode-features">
+                                <span>✓ Manual Control</span>
+                                <span>✓ Custom Parameters</span>
+                                <span>✓ Expert Configuration</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="device-card" data-algo="nist-purge" title="Enhanced security - Good balance">
-                        <div class="device-icon">🔒</div>
-                        <h3>NIST Purge</h3>
-                        <p>NIST SP 800-88 Purge (3 passes) - Enhanced security</p>
-                        <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                    <!-- Quick Wipe Algorithms -->
+                    <div id="quickWipeAlgorithms" class="algorithm-section" style="display: none;">
+                        <h3 class="section-title">Quick Wipe Algorithms</h3>
+                        <div class="device-grid" id="quickAlgorithmGrid">
+                            <div class="device-card" data-algo="nist-clear" title="Fast and reliable - Recommended for most users">
+                                <div class="device-icon">✅</div>
+                                <h3>NIST Clear</h3>
+                                <p>NIST SP 800-88 Clear (1 pass) - Fast and reliable</p>
+                                <div class="security-level" style="color: #4ecdc4;">⭐ Basic</div>
+                            </div>
+
+                            <div class="device-card" data-algo="zeros" title="Quick wipe with zeros - Fastest option">
+                                <div class="device-icon">0️⃣</div>
+                                <h3>Zero Fill</h3>
+                                <p>Zero Fill (1 pass) - Quick wipe with zeros</p>
+                                <div class="security-level" style="color: #4ecdc4;">⭐ Basic</div>
+                            </div>
+
+                            <div class="device-card" data-algo="nist-purge" title="Enhanced security - Good balance">
+                                <div class="device-icon">🔒</div>
+                                <h3>NIST Purge</h3>
+                                <p>NIST SP 800-88 Purge (3 passes) - Enhanced security</p>
+                                <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                            </div>
+
+                            <div class="device-card" data-algo="dod-3pass" title="Government standard - Widely accepted">
+                                <div class="device-icon">🇺🇸</div>
+                                <h3>DoD 3-Pass</h3>
+                                <p>DoD 5220.22-M Standard (3 passes) - Government standard</p>
+                                <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                            </div>
+
+                            <div class="device-card" data-algo="random" title="Cryptographically secure random data">
+                                <div class="device-icon">🎲</div>
+                                <h3>Random Data</h3>
+                                <p>Random Data (3 passes) - Cryptographically secure</p>
+                                <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                            </div>
+
+                            <div class="device-card" data-algo="dod-7pass" title="Maximum security - Military grade">
+                                <div class="device-icon">🛡️</div>
+                                <h3>DoD 7-Pass</h3>
+                                <p>DoD 5220.22-M Enhanced (7 passes) - Maximum security</p>
+                                <div class="security-level" style="color: #e74c3c;">⭐⭐⭐ High</div>
+                            </div>
+
+                            <div class="device-card" data-algo="gutmann" title="Ultimate data destruction - Very slow but thorough">
+                                <div class="device-icon">🌀</div>
+                                <h3>Gutmann Method</h3>
+                                <p>Gutmann Method (35 passes) - Ultimate data destruction</p>
+                                <div class="security-level" style="color: #e74c3c;">⭐⭐⭐ Extreme</div>
+                            </div>
+
+                            <div class="device-card" data-algo="custom" title="For advanced users - Configurable">
+                                <div class="device-icon">⚙️</div>
+                                <h3>Custom</h3>
+                                <p>Custom Algorithm (3 passes) - Advanced users</p>
+                                <div class="security-level" style="color: #9b59b6;">⚙️ Advanced</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="device-card" data-algo="dod-3pass" title="Government standard - Widely accepted">
-                        <div class="device-icon">🇺🇸</div>
-                        <h3>DoD 3-Pass</h3>
-                        <p>DoD 5220.22-M Standard (3 passes) - Government standard</p>
-                        <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                    <!-- Deep Wipe Options -->
+                    <div id="deepWipeOptions" class="algorithm-section" style="display: none;">
+                        <h3 class="section-title">Deep Wipe - Cryptographic Erase Options</h3>
+                        <div class="device-grid" id="deepAlgorithmGrid">
+                            <div class="device-card" data-algo="rea-basic" title="Randomized Encryption Algorithm with basic security">
+                                <div class="device-icon">🔑</div>
+                                <h3>REA Basic</h3>
+                                <p>Randomized Encryption + NIST Clear overwrite</p>
+                                <div class="security-level" style="color: #e74c3c;">🔒 Maximum</div>
+                            </div>
+
+                            <div class="device-card" data-algo="rea-multichain" title="Multichain encryption for ultimate security">
+                                <div class="device-icon">⛓️</div>
+                                <h3>REA Multichain</h3>
+                                <p>Multichain encryption + DoD 3-pass overwrite</p>
+                                <div class="security-level" style="color: #e74c3c;">🔒🔒 Ultimate</div>
+                            </div>
+
+                            <div class="device-card" data-algo="rea-extreme" title="Maximum encryption + multiple overwrites">
+                                <div class="device-icon">🚀</div>
+                                <h3>REA Extreme</h3>
+                                <p>Multichain encryption + Gutmann overwrite</p>
+                                <div class="security-level" style="color: #8e44ad;">🔒🔒🔒 Extreme</div>
+                            </div>
+
+                            <div class="device-card" data-algo="rea-custom" title="Custom encryption parameters">
+                                <div class="device-icon">🛠️</div>
+                                <h3>REA Custom</h3>
+                                <p>Custom encryption + selectable overwrite</p>
+                                <div class="security-level" style="color: #9b59b6;">⚙️ Custom</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="device-card" data-algo="random" title="Cryptographically secure random data">
-                        <div class="device-icon">🎲</div>
-                        <h3>Random Data</h3>
-                        <p>Random Data (3 passes) - Cryptographically secure</p>
-                        <div class="security-level" style="color: #f39c12;">⭐⭐ Standard</div>
+                    <!-- Advanced Mode Options -->
+                    <div id="advancedModeOptions" class="algorithm-section" style="display: none;">
+                        <h3 class="section-title">Advanced Mode - Manual Algorithm Selection</h3>
+                        <div class="advanced-controls">
+                            <div class="algorithm-selector">
+                                <label for="algorithmSelect">Select Algorithm:</label>
+                                <select id="algorithmSelect">
+                                    <optgroup label="Quick Wipe Algorithms">
+                                        <option value="nist-clear">NIST Clear (1 pass)</option>
+                                        <option value="zeros">Zero Fill (1 pass)</option>
+                                        <option value="nist-purge">NIST Purge (3 passes)</option>
+                                        <option value="dod-3pass">DoD 3-Pass</option>
+                                        <option value="random">Random Data (3 passes)</option>
+                                        <option value="dod-7pass">DoD 7-Pass</option>
+                                        <option value="gutmann">Gutmann (35 passes)</option>
+                                        <option value="custom">Custom Pattern</option>
+                                    </optgroup>
+                                    <optgroup label="Deep Wipe Algorithms">
+                                        <option value="rea-basic">REA Basic</option>
+                                        <option value="rea-multichain">REA Multichain</option>
+                                        <option value="rea-extreme">REA Extreme</option>
+                                        <option value="rea-custom">REA Custom</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+
+                            <div class="advanced-options">
+                                <div class="option-group">
+                                    <label>
+                                        <input type="checkbox" id="verifyData" checked> Verify after wipe
+                                    </label>
+                                </div>
+                                <div class="option-group">
+                                    <label>
+                                        <input type="checkbox" id="generateCert" checked> Generate certificate
+                                    </label>
+                                </div>
+                                <div class="option-group" id="customPassesGroup" style="display: none;">
+                                    <label for="customPasses">Number of passes:</label>
+                                    <input type="number" id="customPasses" min="1" max="50" value="3">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Devices Section -->
+                <div id="mobileDevicesSection" class="device-section" style="display: none;">
+                    <h2 class="page-title">Mobile Device Erase Options</h2>
+
+                    <div class="mobile-options-grid">
+                        <div class="device-card" data-mobile="edl" title="Emergency Download Mode for Qualcomm devices">
+                            <div class="device-icon">📲</div>
+                            <h3>EDL Mode</h3>
+                            <p>Emergency Download Mode for Qualcomm chipsets</p>
+                            <div class="security-level" style="color: #e74c3c;">🔧 Technical</div>
+                        </div>
+
+                        <div class="device-card" data-mobile="spflash" title="SP Flash Tool for MediaTek devices">
+                            <div class="device-icon">⚡</div>
+                            <h3>SP Flash Tool</h3>
+                            <p>MediaTek SP Flash Tool mode</p>
+                            <div class="security-level" style="color: #f39c12;">🔧 MediaTek</div>
+                        </div>
+
+                        <div class="device-card" data-mobile="odin" title="Odin Download Mode for Samsung devices">
+                            <div class="device-icon">🔄</div>
+                            <h3>Odin Download</h3>
+                            <p>Samsung Odin download mode</p>
+                            <div class="security-level" style="color: #3498db;">🔧 Samsung</div>
+                        </div>
+
+                        <div class="device-card" data-mobile="adb" title="ADB-based factory reset and encryption">
+                            <div class="device-icon">🤖</div>
+                            <h3>ADB Factory Reset</h3>
+                            <p>ADB-based secure factory reset</p>
+                            <div class="security-level" style="color: #4ecdc4;">🔧 Standard</div>
+                        </div>
                     </div>
 
-                    <div class="device-card" data-algo="dod-7pass" title="Maximum security - Military grade">
-                        <div class="device-icon">🛡️</div>
-                        <h3>DoD 7-Pass</h3>
-                        <p>DoD 5220.22-M Enhanced (7 passes) - Maximum security</p>
-                        <div class="security-level" style="color: #e74c3c;">⭐⭐⭐ High</div>
-                    </div>
-
-                    <div class="device-card" data-algo="gutmann" title="Ultimate data destruction - Very slow but thorough">
-                        <div class="device-icon">🌀</div>
-                        <h3>Gutmann Method</h3>
-                        <p>Gutmann Method (35 passes) - Ultimate data destruction</p>
-                        <div class="security-level" style="color: #e74c3c;">⭐⭐⭐ Extreme</div>
-                    </div>
-
-                    <div class="device-card" data-algo="custom" title="For advanced users - Configurable">
-                        <div class="device-icon">⚙️</div>
-                        <h3>Custom</h3>
-                        <p>Custom Algorithm (3 passes) - Advanced users</p>
-                        <div class="security-level" style="color: #9b59b6;">⚙️ Advanced</div>
+                    <div id="mobileInstructions" class="mobile-instructions" style="display: none;">
+                        <h3>Connection Instructions</h3>
+                        <div id="instructionContent">
+                            <!-- Instructions will be populated based on selection -->
+                        </div>
                     </div>
                 </div>
 
@@ -102,23 +281,185 @@
     <script>
         let selectedDevice = null;
         let selectedAlgorithm = null;
+        let selectedWipeMode = null;
+        let selectedDeviceType = null;
+        let selectedMobileMode = null;
         let availableDevices = [];
 
-        // Load available devices from API
+        // Device type selection
+        document.querySelectorAll('.device-type-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.device-type-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedDeviceType = card.dataset.type;
+
+                // Show appropriate section
+                if (selectedDeviceType === 'storage') {
+                    document.getElementById('storageDevicesSection').style.display = 'block';
+                    document.getElementById('mobileDevicesSection').style.display = 'none';
+                    loadDevices();
+                } else if (selectedDeviceType === 'mobile') {
+                    document.getElementById('storageDevicesSection').style.display = 'none';
+                    document.getElementById('mobileDevicesSection').style.display = 'block';
+                }
+
+                checkStartButton();
+            });
+        });
+
+        // Wipe mode selection
+        document.querySelectorAll('.wipe-mode-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.wipe-mode-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedWipeMode = card.dataset.mode;
+
+                // Hide all algorithm sections
+                document.querySelectorAll('.algorithm-section').forEach(section => {
+                    section.style.display = 'none';
+                });
+
+                // Show appropriate algorithm section
+                if (selectedWipeMode === 'quick') {
+                    document.getElementById('quickWipeAlgorithms').style.display = 'block';
+                } else if (selectedWipeMode === 'deep') {
+                    document.getElementById('deepWipeOptions').style.display = 'block';
+                } else if (selectedWipeMode === 'advanced') {
+                    document.getElementById('advancedModeOptions').style.display = 'block';
+                }
+
+                // Reset algorithm selection
+                selectedAlgorithm = null;
+                document.querySelectorAll('.device-card').forEach(c => c.classList.remove('selected'));
+                checkStartButton();
+            });
+        });
+
+        // Quick wipe algorithm selection
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#quickAlgorithmGrid .device-card')) {
+                const card = e.target.closest('.device-card');
+                document.querySelectorAll('#quickAlgorithmGrid .device-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedAlgorithm = card.dataset.algo;
+                checkStartButton();
+            }
+        });
+
+        // Deep wipe algorithm selection
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#deepAlgorithmGrid .device-card')) {
+                const card = e.target.closest('.device-card');
+                document.querySelectorAll('#deepAlgorithmGrid .device-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedAlgorithm = card.dataset.algo;
+                checkStartButton();
+            }
+        });
+
+        // Advanced mode algorithm selection
+        document.getElementById('algorithmSelect')?.addEventListener('change', (e) => {
+            selectedAlgorithm = e.target.value;
+
+            // Show/hide custom passes option
+            const customPassesGroup = document.getElementById('customPassesGroup');
+            if (selectedAlgorithm === 'custom' || selectedAlgorithm === 'random') {
+                customPassesGroup.style.display = 'block';
+            } else {
+                customPassesGroup.style.display = 'none';
+            }
+
+            checkStartButton();
+        });
+
+        // Mobile device mode selection
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.mobile-options-grid .device-card')) {
+                const card = e.target.closest('.device-card');
+                document.querySelectorAll('.mobile-options-grid .device-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedMobileMode = card.dataset.mobile;
+                showMobileInstructions(selectedMobileMode);
+                checkStartButton();
+            }
+        });
+
+        function showMobileInstructions(mode) {
+            const instructionsDiv = document.getElementById('mobileInstructions');
+            const contentDiv = document.getElementById('instructionContent');
+
+            const instructions = {
+                'edl': {
+                    title: 'EDL Mode Instructions',
+                    steps: [
+                        '1. Power off the device completely',
+                        '2. Hold Volume Down + Power buttons simultaneously',
+                        '3. Connect USB cable to computer',
+                        '4. Device should enter EDL mode (emergency download)',
+                        '5. Device will appear as a Qualcomm device in device manager',
+                        '⚠️ This mode requires specific drivers and tools'
+                    ]
+                },
+                'spflash': {
+                    title: 'SP Flash Tool Instructions',
+                    steps: [
+                        '1. Power off the MediaTek device',
+                        '2. Remove battery if possible',
+                        '3. Hold Volume Up button',
+                        '4. Connect USB cable while holding Volume Up',
+                        '5. Device should be detected by SP Flash Tool',
+                        '⚠️ Requires MediaTek USB drivers'
+                    ]
+                },
+                'odin': {
+                    title: 'Odin Download Mode Instructions',
+                    steps: [
+                        '1. Power off the Samsung device',
+                        '2. Hold Volume Down + Home + Power buttons',
+                        '3. Press Volume Up to confirm download mode',
+                        '4. Connect USB cable to computer',
+                        '5. Device should appear in Odin as "Added!"',
+                        '⚠️ Requires Samsung USB drivers'
+                    ]
+                },
+                'adb': {
+                    title: 'ADB Factory Reset Instructions',
+                    steps: [
+                        '1. Enable Developer Options and USB Debugging',
+                        '2. Connect device via USB',
+                        '3. Accept USB debugging prompt on device',
+                        '4. Verify device with "adb devices" command',
+                        '5. Factory reset will be performed via ADB',
+                        '✓ This is the safest and most compatible method'
+                    ]
+                }
+            };
+
+            const instruction = instructions[mode];
+            if (instruction) {
+                contentDiv.innerHTML = `
+                    <h4>${instruction.title}</h4>
+                    <ul style="margin: 15px 0; padding-left: 20px;">
+                        ${instruction.steps.map(step => `<li style="margin: 8px 0;">${step}</li>`).join('')}
+                    </ul>
+                `;
+                instructionsDiv.style.display = 'block';
+            }
+        }
+
+        // Load available storage devices from API
         async function loadDevices() {
             try {
                 const response = await fetch('/api/devices');
                 if (response.ok) {
                     availableDevices = await response.json();
-                    renderDevices();
+                    renderStorageDevices();
                 } else {
-                    // Get detailed error message from the server
                     let errorMessage = 'Failed to load devices from system';
                     try {
                         const errorData = await response.json();
                         errorMessage = errorData.detail || errorMessage;
                     } catch (e) {
-                        // If parsing JSON fails, use status text
                         errorMessage = response.statusText || errorMessage;
                     }
 
@@ -131,8 +472,8 @@
             }
         }
 
-        function renderDevices() {
-            const deviceGrid = document.querySelector('.device-grid:first-of-type');
+        function renderStorageDevices() {
+            const deviceGrid = document.getElementById('storageDeviceGrid');
             deviceGrid.innerHTML = '';
 
             if (availableDevices.length === 0) {
@@ -145,7 +486,6 @@
                 deviceCard.className = 'device-card';
                 deviceCard.dataset.devicePath = device.path;
 
-                // Map device type to icon and display name
                 const typeMap = {
                     'laptop': { icon: '💻', name: 'Laptop/Desktop' },
                     'mobile': { icon: '📱', name: 'Mobile Device' },
@@ -176,7 +516,7 @@
                         return;
                     }
 
-                    document.querySelectorAll('.device-grid:first-of-type .device-card').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('#storageDeviceGrid .device-card').forEach(c => c.classList.remove('selected'));
                     deviceCard.classList.add('selected');
                     selectedDevice = device;
                     checkStartButton();
@@ -186,28 +526,42 @@
             });
         }
 
-        // Algorithm selection
-        document.querySelectorAll('#algorithmGrid .device-card').forEach(card => {
-            card.addEventListener('click', () => {
-                document.querySelectorAll('#algorithmGrid .device-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-                selectedAlgorithm = card.dataset.algo;
-                checkStartButton();
-            });
-        });
-
         function checkStartButton() {
-            document.getElementById('startCleaningBtn').disabled = !(selectedDevice && selectedAlgorithm);
+            const startBtn = document.getElementById('startCleaningBtn');
+
+            if (selectedDeviceType === 'storage') {
+                startBtn.disabled = !(selectedDevice && selectedAlgorithm);
+            } else if (selectedDeviceType === 'mobile') {
+                startBtn.disabled = !selectedMobileMode;
+            } else {
+                startBtn.disabled = true;
+            }
         }
 
         document.getElementById('startCleaningBtn').addEventListener('click', async () => {
-            if (selectedDevice && selectedAlgorithm) {
+            if (selectedDeviceType === 'storage' && selectedDevice && selectedAlgorithm) {
                 try {
+                    // Get advanced mode settings if applicable
+                    let verify = true;
+                    let generateCert = true;
+                    let customPasses = 3;
+
+                    if (selectedWipeMode === 'advanced') {
+                        verify = document.getElementById('verifyData').checked;
+                        generateCert = document.getElementById('generateCert').checked;
+
+                        if (selectedAlgorithm === 'custom' || selectedAlgorithm === 'random') {
+                            customPasses = parseInt(document.getElementById('customPasses').value) || 3;
+                        }
+                    }
+
                     const wipeRequest = {
                         device_path: selectedDevice.path,
                         algorithm: selectedAlgorithm,
-                        verify: true,
-                        generate_certificate: true
+                        verify: verify,
+                        generate_certificate: generateCert,
+                        wipe_mode: selectedWipeMode,
+                        custom_passes: customPasses
                     };
 
                     const response = await fetch('/api/wipe/start', {
@@ -223,6 +577,7 @@
                         sessionStorage.setItem('sessionId', result.data.session_id);
                         sessionStorage.setItem('selectedDevice', JSON.stringify(selectedDevice));
                         sessionStorage.setItem('selectedAlgorithm', selectedAlgorithm);
+                        sessionStorage.setItem('wipeMode', selectedWipeMode);
                         window.location.href = 'progress.html';
                     } else {
                         const error = await response.json();
@@ -232,35 +587,37 @@
                     console.error('Error starting wipe:', error);
                     showError('Error starting wipe operation');
                 }
+            } else if (selectedDeviceType === 'mobile' && selectedMobileMode) {
+                // Handle mobile device operations
+                showError('Mobile device wiping will be implemented in the next phase. Please use storage device wiping for now.');
             }
         });
 
         function showError(message) {
-            // Create error notification
             const errorDiv = document.createElement('div');
             errorDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ff6b6b; color: white; padding: 15px; border-radius: 5px; z-index: 1000; max-width: 300px;';
             errorDiv.textContent = message;
             document.body.appendChild(errorDiv);
 
             setTimeout(() => {
-                document.body.removeChild(errorDiv);
+                if (document.body.contains(errorDiv)) {
+                    document.body.removeChild(errorDiv);
+                }
             }, 5000);
         }
 
-        // Load devices on page load
+        // Initialize page
         document.addEventListener('DOMContentLoaded', () => {
-            loadDevices();
-
-            // Animate algorithm cards
-            const algorithmCards = document.querySelectorAll('#algorithmGrid .device-card');
-            algorithmCards.forEach((card, index) => {
+            // Animate device type cards
+            const deviceTypeCards = document.querySelectorAll('.device-type-card');
+            deviceTypeCards.forEach((card, index) => {
                 card.style.opacity = '0';
                 card.style.transform = 'translateY(50px)';
                 setTimeout(() => {
                     card.style.transition = 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
                     card.style.opacity = '1';
                     card.style.transform = 'translateY(0)';
-                }, (index + 4) * 200); // Offset after device cards
+                }, index * 200);
             });
         });
     </script>

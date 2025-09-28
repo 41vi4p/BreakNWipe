@@ -1,4 +1,4 @@
-/* Data Wipe Application - Updated Stylesheet */
+/* BreakNWipe Enhanced UI - Updated Stylesheet */
 
 * {
     margin: 0;
@@ -397,6 +397,375 @@ body::before {
     padding: 30px;
     margin-bottom: 40px;
     backdrop-filter: blur(6px);
+}
+
+/* New UI Elements for Enhanced BreakNWipe */
+
+/* Device Type Selection Grid */
+.device-type-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 30px;
+    margin-bottom: 50px;
+}
+
+.device-type-card {
+    background: linear-gradient(135deg, rgba(45,45,45,0.6), rgba(64,64,64,0.5));
+    border: 2px solid rgba(85,85,85,0.7);
+    border-radius: 15px;
+    padding: 40px 30px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(6px);
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.device-type-card:hover {
+    border-color: var(--custom-green);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 35px rgba(34,188,88,0.3);
+    background: linear-gradient(135deg, rgba(64,64,64,0.7), rgba(85,85,85,0.6));
+}
+
+.device-type-card.selected {
+    border-color: var(--custom-green);
+    background: linear-gradient(135deg, rgba(64,64,64,0.7), rgba(85,85,85,0.6));
+    box-shadow: 0 0 30px rgba(34,188,88,0.4);
+    transform: scale(1.03);
+}
+
+.device-type-card .device-icon {
+    font-size: 4.5rem;
+    margin-bottom: 20px;
+    display: block;
+    transition: var(--transition-smooth);
+}
+
+.device-type-card:hover .device-icon {
+    transform: scale(1.15) rotate(3deg);
+    filter: brightness(1.3) drop-shadow(0 0 15px rgba(34,188,88,0.5));
+}
+
+.device-type-card h3 {
+    font-size: 1.6rem;
+    margin-bottom: 12px;
+    color: var(--primary-white);
+    font-weight: 700;
+}
+
+.device-type-card p {
+    color: var(--text-gray);
+    font-size: 1.1rem;
+    line-height: 1.5;
+}
+
+/* Wipe Mode Selection Grid */
+.wipe-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 25px;
+    margin-bottom: 40px;
+}
+
+.wipe-mode-card {
+    background: linear-gradient(135deg, rgba(45,45,45,0.6), rgba(64,64,64,0.5));
+    border: 2px solid rgba(85,85,85,0.7);
+    border-radius: 15px;
+    padding: 30px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(6px);
+    min-height: 220px;
+}
+
+.wipe-mode-card:hover {
+    border-color: var(--custom-green);
+    transform: translateY(-5px) scale(1.01);
+    box-shadow: 0 12px 30px rgba(34,188,88,0.25);
+    background: linear-gradient(135deg, rgba(64,64,64,0.7), rgba(85,85,85,0.6));
+}
+
+.wipe-mode-card.selected {
+    border-color: var(--custom-green);
+    background: linear-gradient(135deg, rgba(64,64,64,0.7), rgba(85,85,85,0.6));
+    box-shadow: 0 0 25px rgba(34,188,88,0.35);
+    transform: scale(1.02);
+}
+
+.wipe-mode-card .device-icon {
+    font-size: 3.5rem;
+    margin-bottom: 15px;
+    display: block;
+    transition: var(--transition-smooth);
+}
+
+.wipe-mode-card:hover .device-icon {
+    transform: scale(1.1) rotate(2deg);
+    filter: brightness(1.2) drop-shadow(0 0 10px rgba(34,188,88,0.4));
+}
+
+.mode-features {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.mode-features span {
+    font-size: 0.9rem;
+    color: var(--custom-green);
+    font-weight: 500;
+}
+
+/* Section Titles */
+.section-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 25px;
+    color: var(--primary-white);
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+/* Algorithm Sections */
+.algorithm-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border-radius: 10px;
+    background: rgba(26,26,26,0.3);
+    border: 1px solid rgba(85,85,85,0.5);
+}
+
+/* Advanced Mode Controls */
+.advanced-controls {
+    background: rgba(45,45,45,0.6);
+    border: 2px solid rgba(85,85,85,0.7);
+    border-radius: 15px;
+    padding: 30px;
+    backdrop-filter: blur(6px);
+}
+
+.algorithm-selector {
+    margin-bottom: 25px;
+}
+
+.algorithm-selector label {
+    display: block;
+    color: var(--primary-white);
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+}
+
+.algorithm-selector select {
+    width: 100%;
+    padding: 12px 15px;
+    background: rgba(26,26,26,0.8);
+    border: 2px solid rgba(85,85,85,0.7);
+    border-radius: 8px;
+    color: var(--primary-white);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.algorithm-selector select:focus {
+    outline: none;
+    border-color: var(--custom-green);
+    box-shadow: 0 0 10px rgba(34,188,88,0.3);
+}
+
+.advanced-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.option-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.option-group label {
+    color: var(--primary-white);
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.option-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--custom-green);
+    cursor: pointer;
+}
+
+.option-group input[type="number"] {
+    padding: 8px 12px;
+    background: rgba(26,26,26,0.8);
+    border: 2px solid rgba(85,85,85,0.7);
+    border-radius: 6px;
+    color: var(--primary-white);
+    width: 80px;
+    transition: var(--transition-smooth);
+}
+
+.option-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--custom-green);
+    box-shadow: 0 0 8px rgba(34,188,88,0.3);
+}
+
+/* Mobile Options Grid */
+.mobile-options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+/* Mobile Instructions */
+.mobile-instructions {
+    background: rgba(45,45,45,0.6);
+    border: 2px solid rgba(85,85,85,0.7);
+    border-radius: 15px;
+    padding: 30px;
+    margin-top: 30px;
+    backdrop-filter: blur(6px);
+}
+
+.mobile-instructions h3 {
+    color: var(--primary-white);
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.mobile-instructions h4 {
+    color: var(--custom-green);
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+}
+
+.mobile-instructions ul {
+    color: var(--primary-white);
+    line-height: 1.6;
+}
+
+.mobile-instructions li {
+    margin: 10px 0;
+    padding-left: 10px;
+}
+
+/* Security Level Indicators */
+.security-level {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    padding: 5px 10px;
+    border-radius: 15px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid currentColor;
+    display: inline-block;
+}
+
+/* Device Section Styling */
+.device-section {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 1px solid rgba(85,85,85,0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .device-type-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .wipe-mode-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .device-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .mobile-options-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .advanced-options {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .container {
+        padding: 20px;
+    }
+
+    .content {
+        padding: 30px 20px;
+    }
+
+    .header {
+        padding: 30px 20px;
+    }
+
+    .header h1 {
+        font-size: 2.2rem;
+    }
+
+    .page-title {
+        font-size: 1.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header h1 {
+        font-size: 1.8rem;
+        letter-spacing: 1px;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+    }
+
+    .device-type-card,
+    .wipe-mode-card,
+    .device-card {
+        padding: 20px;
+    }
+
+    .device-type-card .device-icon,
+    .wipe-mode-card .device-icon {
+        font-size: 3rem;
+    }
+
+    .nav-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .nav-button {
+        padding: 10px 15px;
+        font-size: 0.85rem;
+    }
 }
 
 .progress-bar-container {
