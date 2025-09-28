@@ -122,6 +122,7 @@ class DeviceDetector:
         self._update_from_smartctl(device_info, device_path)
         self._update_from_nvme(device_info, device_path)
         self._update_mount_status(device_info, device_path)
+        self._detect_hidden_areas(device_info, device_path)
 
         # Create StorageDevice object
         try:
@@ -135,11 +136,21 @@ class DeviceDetector:
         try:
             sys_device_path = self.sys_block_path / device_name
 
-            # Get capacity
+            # Get capacity - total physical sectors
             size_file = sys_device_path / "size"
             if size_file.exists():
                 sectors = int(size_file.read_text().strip())
-                device_info['capacity_bytes'] = sectors * 512  # Assume 512 byte sectors
+                device_info['capacity_bytes'] = sectors * 512  # Standard 512 byte sectors
+                device_info['total_sectors'] = sectors
+
+            # Get logical block size and physical block size
+            logical_block_size_file = sys_device_path / "queue" / "logical_block_size"
+            if logical_block_size_file.exists():
+                device_info['logical_block_size'] = int(logical_block_size_file.read_text().strip())
+
+            physical_block_size_file = sys_device_path / "queue" / "physical_block_size"
+            if physical_block_size_file.exists():
+                device_info['physical_block_size'] = int(physical_block_size_file.read_text().strip())
 
             # Check if rotational
             rotational_file = sys_device_path / "queue" / "rotational"
@@ -422,3 +433,114 @@ class DeviceDetector:
             logger.debug(f"Error checking TRIM support for {device_path}: {e}")
 
         return False
+
+    def _detect_hidden_areas(self, device_info: Dict[str, Any], device_path: str):
+        """Detect hidden areas like HPA (Host Protected Area) and DCO (Device Configuration Overlay)."""
+        try:
+            device_info['hpa_detected'] = False
+            device_info['dco_detected'] = False
+            device_info['hidden_sectors'] = 0
+            device_info['native_max_sectors'] = device_info.get('total_sectors', 0)
+
+            # Check for HPA using hdparm
+            self._check_hpa_with_hdparm(device_info, device_path)
+
+            # Check for additional hidden areas using smartctl
+            self._check_hidden_with_smartctl(device_info, device_path)
+
+            # Calculate total hidden capacity
+            total_sectors = device_info.get('total_sectors', 0)
+            native_max = device_info.get('native_max_sectors', 0)
+
+            if native_max > total_sectors:
+                device_info['hidden_sectors'] = native_max - total_sectors
+                device_info['hidden_capacity_bytes'] = device_info['hidden_sectors'] * 512
+            else:
+                device_info['hidden_capacity_bytes'] = 0
+
+            # Add descriptive capacity breakdown
+            self._add_capacity_breakdown(device_info)
+
+        except Exception as e:
+            logger.debug(f"Error detecting hidden areas for {device_path}: {e}")
+
+    def _check_hpa_with_hdparm(self, device_info: Dict[str, Any], device_path: str):
+        """Check for Host Protected Area using hdparm."""
+        try:
+            cmd = ['hdparm', '-N', device_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+            if result.returncode == 0:
+                output = result.stdout
+
+                # Look for HPA information
+                for line in output.split('\n'):
+                    if 'max sectors' in line.lower():
+                        # Extract current and native max sectors
+                        parts = line.split(',')
+                        for part in parts:
+                            if 'HPA' in part and 'is enabled' in part:
+                                device_info['hpa_detected'] = True
+                            elif 'native max' in part.lower():
+                                # Try to extract native max sectors
+                                numbers = re.findall(r'\d+', part)
+                                if numbers:
+                                    device_info['native_max_sectors'] = int(numbers[-1])
+
+        except Exception as e:
+            logger.debug(f"Error checking HPA with hdparm for {device_path}: {e}")
+
+    def _check_hidden_with_smartctl(self, device_info: Dict[str, Any], device_path: str):
+        """Check for hidden areas using smartctl."""
+        try:
+            cmd = ['smartctl', '-i', device_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+            if result.returncode == 0:
+                output = result.stdout
+
+                # Look for total LBA sectors vs user addressable sectors
+                user_capacity_match = re.search(r'User Capacity:\s*([0-9,]+)\s*bytes', output)
+                device_size_match = re.search(r'Device size with M = 1000\*1000:\s*([0-9,]+)', output)
+
+                if user_capacity_match:
+                    user_capacity_str = user_capacity_match.group(1).replace(',', '')
+                    user_capacity = int(user_capacity_str)
+                    device_info['user_capacity_bytes'] = user_capacity
+
+                    # Compare with total capacity to detect hidden areas
+                    total_capacity = device_info.get('capacity_bytes', 0)
+                    if total_capacity > user_capacity:
+                        device_info['hidden_capacity_bytes'] = total_capacity - user_capacity
+                        device_info['hidden_sectors'] = device_info['hidden_capacity_bytes'] // 512
+
+        except Exception as e:
+            logger.debug(f"Error checking hidden areas with smartctl for {device_path}: {e}")
+
+    def _add_capacity_breakdown(self, device_info: Dict[str, Any]):
+        """Add human-readable capacity breakdown information."""
+        def format_bytes(bytes_val):
+            if bytes_val == 0:
+                return "0 B"
+            for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                if bytes_val < 1024.0:
+                    return f"{bytes_val:.1f} {unit}"
+                bytes_val /= 1024.0
+            return f"{bytes_val:.1f} PB"
+
+        total_capacity = device_info.get('capacity_bytes', 0)
+        hidden_capacity = device_info.get('hidden_capacity_bytes', 0)
+        user_capacity = total_capacity - hidden_capacity
+
+        device_info['capacity_breakdown'] = {
+            'total_physical': format_bytes(total_capacity),
+            'user_accessible': format_bytes(user_capacity),
+            'hidden_areas': format_bytes(hidden_capacity),
+            'hidden_percentage': (hidden_capacity / total_capacity * 100) if total_capacity > 0 else 0
+        }
+
+        # Update the main capacity_human to show breakdown
+        if hidden_capacity > 0:
+            device_info['capacity_human'] = f"{format_bytes(total_capacity)} (User: {format_bytes(user_capacity)}, Hidden: {format_bytes(hidden_capacity)})"
+        else:
+            device_info['capacity_human'] = format_bytes(total_capacity)

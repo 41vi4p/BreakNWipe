@@ -33,6 +33,12 @@ class DeviceInfo:
     vendor: Optional[str] = None
     firmware_version: Optional[str] = None
     wwn: Optional[str] = None
+    # Hidden area detection
+    hidden_capacity_bytes: Optional[int] = None
+    hidden_sectors: Optional[int] = None
+    hpa_detected: Optional[bool] = None
+    dco_detected: Optional[bool] = None
+    capacity_breakdown: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -210,7 +216,12 @@ class WipeReport:
                 'interface': self.device_info.interface if self.device_info else None,
                 'vendor': self.device_info.vendor if self.device_info else None,
                 'firmware_version': self.device_info.firmware_version if self.device_info else None,
-                'wwn': self.device_info.wwn if self.device_info else None
+                'wwn': self.device_info.wwn if self.device_info else None,
+                'hidden_capacity_bytes': self.device_info.hidden_capacity_bytes if self.device_info else None,
+                'hidden_sectors': self.device_info.hidden_sectors if self.device_info else None,
+                'hpa_detected': self.device_info.hpa_detected if self.device_info else None,
+                'dco_detected': self.device_info.dco_detected if self.device_info else None,
+                'capacity_breakdown': self.device_info.capacity_breakdown if self.device_info else None
             },
             'wipe_operation': {
                 'algorithm_used': self.algorithm_used,
@@ -301,7 +312,12 @@ class WipeReport:
                 interface=device_data.get('interface', 'unknown'),
                 vendor=device_data.get('vendor'),
                 firmware_version=device_data.get('firmware_version'),
-                wwn=device_data.get('wwn')
+                wwn=device_data.get('wwn'),
+                hidden_capacity_bytes=device_data.get('hidden_capacity_bytes'),
+                hidden_sectors=device_data.get('hidden_sectors'),
+                hpa_detected=device_data.get('hpa_detected'),
+                dco_detected=device_data.get('dco_detected'),
+                capacity_breakdown=device_data.get('capacity_breakdown')
             )
 
         # Wipe operation

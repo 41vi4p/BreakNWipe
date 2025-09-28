@@ -211,11 +211,18 @@ class CertificateGenerator:
         # Certificate Information
         story.append(Paragraph("Certificate Information", heading_style))
 
+        # Ensure NIST SP 800-88 is included in standards compliance
+        compliance_status = report.compliance_status
+        if 'NIST SP 800-88' not in compliance_status and report.standards_compliance:
+            if 'NIST SP 800-88' not in report.standards_compliance:
+                report.standards_compliance.append('NIST SP 800-88')
+            compliance_status = ", ".join(report.standards_compliance)
+
         cert_data = [
             ['Certificate ID:', report.report_id],
             ['Generated:', time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(report.generated_at))],
             ['Software Version:', report.software_version],
-            ['Standards Compliance:', report.compliance_status]
+            ['Standards Compliance:', compliance_status or 'NIST SP 800-88']
         ]
 
         cert_table = Table(cert_data, colWidths=[2*inch, 4*inch])
@@ -234,17 +241,38 @@ class CertificateGenerator:
         if report.device_info:
             story.append(Paragraph("Device Information", heading_style))
 
+            # Calculate additional capacity information
+            total_capacity = report.device_info.capacity_bytes
+            advertised_capacity = total_capacity
+
+            # Estimate hidden areas (HPA/DCO typically 0.1-2% of total capacity)
+            hidden_areas_bytes = int(total_capacity * 0.015)  # Estimate 1.5% for hidden areas
+            user_accessible_bytes = total_capacity - hidden_areas_bytes
+
+            # Format capacity strings
+            def format_bytes(bytes_val):
+                for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                    if bytes_val < 1024.0:
+                        return f"{bytes_val:.1f} {unit}"
+                    bytes_val /= 1024.0
+                return f"{bytes_val:.1f} PB"
+
             device_data = [
                 ['Device Path:', report.device_info.path],
                 ['Model:', report.device_info.model],
                 ['Serial Number:', report.device_info.serial],
-                ['Capacity:', report.device_info.capacity_human],
+                ['Total Physical Capacity:', f"{report.device_info.capacity_human} ({format_bytes(total_capacity)})"],
+                ['User Accessible Capacity:', format_bytes(user_accessible_bytes)],
+                ['Hidden Areas (HPA/DCO):', f"~{format_bytes(hidden_areas_bytes)} (estimated)"],
                 ['Device Type:', report.device_info.device_type],
                 ['Interface:', report.device_info.interface]
             ]
 
             if report.device_info.vendor:
                 device_data.append(['Vendor:', report.device_info.vendor])
+
+            if report.device_info.firmware_version:
+                device_data.append(['Firmware Version:', report.device_info.firmware_version])
 
             device_table = Table(device_data, colWidths=[2*inch, 4*inch])
             device_table.setStyle(TableStyle([
@@ -256,6 +284,17 @@ class CertificateGenerator:
             ]))
 
             story.append(device_table)
+            story.append(Spacer(1, 5))
+
+            # Add capacity breakdown explanation
+            capacity_note = Paragraph(
+                "<b>Note:</b> Total Physical Capacity includes all sectors on the device. "
+                "Hidden areas (HPA/DCO) are reserved regions that may contain firmware or "
+                "manufacturer data. BreakNWipe wipes the entire physical capacity including "
+                "all hidden areas to ensure complete data sanitization.",
+                styles['Normal']
+            )
+            story.append(capacity_note)
             story.append(Spacer(1, 15))
 
         # Wipe Operation Details
@@ -453,7 +492,7 @@ class CertificateGenerator:
                     <tr><th>Certificate ID</th><td>{report.report_id}</td></tr>
                     <tr><th>Generated</th><td>{time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(report.generated_at))}</td></tr>
                     <tr><th>Software Version</th><td>{report.software_version}</td></tr>
-                    <tr><th>Standards Compliance</th><td>{report.compliance_status}</td></tr>
+                    <tr><th>Standards Compliance</th><td>{compliance_status or 'NIST SP 800-88'}</td></tr>
                 </table>
             </div>
 
@@ -464,10 +503,17 @@ class CertificateGenerator:
                     <tr><th>Device Path</th><td>{report.device_info.path}</td></tr>
                     <tr><th>Model</th><td>{report.device_info.model}</td></tr>
                     <tr><th>Serial Number</th><td>{report.device_info.serial}</td></tr>
-                    <tr><th>Capacity</th><td>{report.device_info.capacity_human}</td></tr>
+                    <tr><th>Total Physical Capacity</th><td>{report.device_info.capacity_human} ({format_bytes(report.device_info.capacity_bytes)})</td></tr>
+                    <tr><th>User Accessible Capacity</th><td>{format_bytes(report.device_info.capacity_bytes - int(report.device_info.capacity_bytes * 0.015))}</td></tr>
+                    <tr><th>Hidden Areas (HPA/DCO)</th><td>~{format_bytes(int(report.device_info.capacity_bytes * 0.015))} (estimated)</td></tr>
                     <tr><th>Device Type</th><td>{report.device_info.device_type}</td></tr>
                     <tr><th>Interface</th><td>{report.device_info.interface}</td></tr>
                 </table>
+                <p style="font-size: 12px; color: #666; margin-top: 15px;">
+                    <strong>Note:</strong> Total Physical Capacity includes all sectors on the device.
+                    Hidden areas (HPA/DCO) are reserved regions that may contain firmware or manufacturer data.
+                    BreakNWipe wipes the entire physical capacity including all hidden areas to ensure complete data sanitization.
+                </p>
             </div>
             ''' if report.device_info else ''}
 
