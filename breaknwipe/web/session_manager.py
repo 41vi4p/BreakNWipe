@@ -8,6 +8,9 @@ import threading
 import uuid
 import time
 import asyncio
+import os
+import json
+import logging
 from typing import Dict, Optional, List
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -21,6 +24,8 @@ from .models import (
     WipeSession, WipeProgress, WipeRequest, DeviceInfo,
     WipeSessionStatus, DeviceType, WipeAlgorithm
 )
+
+logger = logging.getLogger(__name__)
 
 
 class WipeSessionManager:
@@ -300,8 +305,58 @@ class WipeSessionManager:
                         operator="System User"
                     )
 
-                    cert_files = self.cert_generator.generate_certificate(wipe_report)
+                    # Add session ID to the report for QR code generation
+                    wipe_report.session_id = session_id
+
+                    # Check internet connectivity for blockchain upload
+                    from ..utils import check_internet_connectivity, check_blockchain_service_connectivity
+
+                    # Read blockchain config
+                    blockchain_config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'blockchain_config.json')
+                    auto_blockchain = True  # Default to auto-upload
+                    blockchain_rpc_url = None
+
+                    try:
+                        if os.path.exists(blockchain_config_path):
+                            with open(blockchain_config_path, 'r') as f:
+                                config = json.load(f)
+                                auto_blockchain = config.get('breaknwipe', {}).get('auto_blockchain_store', True)
+                                blockchain_rpc_url = config.get('network', {}).get('rpc_url')
+                    except Exception as e:
+                        logger.debug(f"Could not read blockchain config: {e}")
+
+                    # Check connectivity and attempt blockchain upload
+                    store_on_blockchain = False
+                    if auto_blockchain:
+                        if check_internet_connectivity():
+                            logger.info("Internet connectivity detected, attempting blockchain upload")
+                            if blockchain_rpc_url and check_blockchain_service_connectivity(blockchain_rpc_url):
+                                store_on_blockchain = True
+                                logger.info("Blockchain service is reachable, will upload to blockchain")
+                            else:
+                                logger.warning("Blockchain service is not reachable, skipping blockchain upload")
+                        else:
+                            logger.warning("No internet connectivity, skipping blockchain upload")
+
+                    # Generate certificate with blockchain upload if available
+                    cert_files = self.cert_generator.generate_certificate(
+                        wipe_report,
+                        include_qr=True,
+                        store_on_blockchain=store_on_blockchain
+                    )
                     session.certificate_path = cert_files.get('pdf', '')
+
+                    # Store the QR data that was generated for the certificate
+                    blockchain_result = cert_files.get('blockchain_result')
+                    qr_data = self.cert_generator._generate_qr_data(wipe_report, blockchain_result)
+                    session.qr_data = qr_data
+
+                    # Log blockchain result if available
+                    if blockchain_result:
+                        if blockchain_result.get('success'):
+                            logger.info(f"Certificate successfully uploaded to blockchain: {blockchain_result.get('transaction_hash', 'Already exists')}")
+                        else:
+                            logger.error(f"Failed to upload to blockchain: {blockchain_result.get('error', 'Unknown error')}")
 
                     # Store report in database
                     try:

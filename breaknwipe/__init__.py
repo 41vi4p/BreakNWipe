@@ -26,6 +26,19 @@ __credits__ = [
     'Anastasia Lopes'
 ]
 
+# Load environment variables for blockchain integration
+import os
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    # python-dotenv not available, environment variables should be set manually
+    pass
+
 from .wipe_engine import WipeEngine, WipeAlgorithm
 from .device import DeviceHandler, StorageDevice
 from .certificate import CertificateGenerator, WipeReport

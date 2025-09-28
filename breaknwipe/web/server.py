@@ -261,6 +261,7 @@ class WebServer:
                     "completed_at": session.progress.last_updated.isoformat()
                 },
                 "certificate_path": getattr(session, 'certificate_path', None),
+                "qr_data": getattr(session, 'qr_data', None),
                 "report_id": f"BNW-{session_id[:8]}-{int(time.time())}"
             }
 

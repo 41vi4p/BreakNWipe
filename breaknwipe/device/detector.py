@@ -122,7 +122,6 @@ class DeviceDetector:
         self._update_from_smartctl(device_info, device_path)
         self._update_from_nvme(device_info, device_path)
         self._update_mount_status(device_info, device_path)
-        self._detect_hidden_areas(device_info, device_path)
 
         # Create StorageDevice object
         try:
@@ -141,7 +140,6 @@ class DeviceDetector:
             if size_file.exists():
                 sectors = int(size_file.read_text().strip())
                 device_info['capacity_bytes'] = sectors * 512  # Standard 512 byte sectors
-                device_info['total_sectors'] = sectors
 
             # Get logical block size and physical block size
             logical_block_size_file = sys_device_path / "queue" / "logical_block_size"
@@ -440,7 +438,7 @@ class DeviceDetector:
             device_info['hpa_detected'] = False
             device_info['dco_detected'] = False
             device_info['hidden_sectors'] = 0
-            device_info['native_max_sectors'] = device_info.get('total_sectors', 0)
+            device_info['native_max_sectors'] = device_info.get('capacity_bytes', 0) // 512
 
             # Check for HPA using hdparm
             self._check_hpa_with_hdparm(device_info, device_path)
@@ -449,7 +447,7 @@ class DeviceDetector:
             self._check_hidden_with_smartctl(device_info, device_path)
 
             # Calculate total hidden capacity
-            total_sectors = device_info.get('total_sectors', 0)
+            total_sectors = device_info.get('capacity_bytes', 0) // 512
             native_max = device_info.get('native_max_sectors', 0)
 
             if native_max > total_sectors:

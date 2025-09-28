@@ -165,23 +165,30 @@ class CertificateGenerator:
         report.certificate_hash = report_hash
 
     def _generate_qr_data(self, report: WipeReport, blockchain_result: Optional[Dict[str, Any]] = None) -> str:
-        """Generate QR code data for report with optional blockchain information."""
+        """Generate QR code data for report to match qr-report.html format."""
+        # Use the same format as qr-report.html for consistency
+        qr_data = {
+            'report_id': report.report_id,
+            'session_id': getattr(report, 'session_id', report.report_id),  # Use session_id if available, fallback to report_id
+            'device_model': report.device_info.model if report.device_info else 'Unknown',
+            'algorithm': report.algorithm_used or 'Unknown',
+            'completed_at': report.end_time,
+            'verification_url': f'http://localhost:8000/api/wipe/verify/{getattr(report, "session_id", report.report_id)}'
+        }
+
+        # If blockchain is available, add blockchain information as additional data
         if blockchain_result and blockchain_result.get('success') and self.blockchain_store:
-            # Generate blockchain-enhanced QR data
-            qr_data = self.blockchain_store.create_blockchain_qr_data(report, blockchain_result)
-        else:
-            # Generate traditional QR data
-            qr_data = {
-                'type': 'breaknwipe_certificate',
-                'version': '1.0',
-                'report_id': report.report_id,
-                'device_serial': report.device_info.serial if report.device_info else 'Unknown',
-                'success': report.success,
-                'algorithm': report.algorithm_used,
-                'timestamp': int(report.generated_at),
-                'hash': report.certificate_hash,
-                'verify_url': f'https://datawipe.vercel.app?report_id={report.report_id}'
+            qr_data['blockchain'] = {
+                'network': 'sepolia',
+                'contract': self.blockchain_store.config.contract_address,
+                'hash': blockchain_result.get('report_hash'),
+                'tx_hash': blockchain_result.get('transaction_hash'),
+                'verified': True
             }
+            # Update verification URL to include blockchain verification
+            qr_data['blockchain_verification_url'] = self.blockchain_store.get_blockchain_verification_url(
+                blockchain_result.get('report_hash'), report.report_id
+            )
 
         return json.dumps(qr_data, separators=(',', ':'))
 

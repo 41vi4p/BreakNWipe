@@ -355,8 +355,23 @@ class BlockchainCertificateStore:
         datawipe_base_url = os.getenv('DATAWIPE_BASE_URL', 'https://datawipe.vercel.app')
         return f"{datawipe_base_url}?data={report_id}"
 
+    def get_blockchain_verification_url(self, report_hash: str, report_id: str) -> str:
+        """Get blockchain-specific verification URL with hash for direct blockchain verification."""
+        datawipe_base_url = os.getenv('DATAWIPE_BASE_URL', 'https://datawipe.vercel.app')
+
+        if report_hash:
+            # Use blockchain hash for direct verification
+            return f"{datawipe_base_url}?hash={report_hash}&contract={self.config.contract_address}&network=sepolia"
+        else:
+            # Fallback to report ID
+            return f"{datawipe_base_url}?data={report_id}"
+
     def create_blockchain_qr_data(self, report: WipeReport, blockchain_result: Dict[str, Any]) -> Dict[str, Any]:
         """Create QR data that includes blockchain verification information."""
+        # Create blockchain-specific verification URL with hash
+        report_hash = blockchain_result.get('report_hash')
+        blockchain_verify_url = self.get_blockchain_verification_url(report_hash, report.report_id)
+
         qr_data = {
             'type': 'breaknwipe_blockchain_certificate',
             'version': '2.0',
@@ -369,11 +384,13 @@ class BlockchainCertificateStore:
             'blockchain': {
                 'network': 'sepolia',
                 'contract': self.config.contract_address,
-                'hash': blockchain_result.get('report_hash'),
+                'hash': report_hash,
                 'tx_hash': blockchain_result.get('transaction_hash'),
-                'verified': blockchain_result.get('success', False)
+                'verified': blockchain_result.get('success', False),
+                'block_number': blockchain_result.get('block_number'),
+                'verification_url': blockchain_verify_url
             },
-            'verify_url': self.get_verification_url(report.report_id)
+            'verify_url': blockchain_verify_url
         }
 
         return qr_data
