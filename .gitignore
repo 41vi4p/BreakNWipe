@@ -4,3 +4,7 @@
 /breaknwipe/cli/__pycache__
 /breaknwipe/device/__pycache__
 /breaknwipe/wipe_engine/__pycache__
+/breaknwipe/logging/__pycache__
+/breaknwipe/tests/__pycache__
+/breaknwipe/tests/test_data/__pycache__
+/breaknwipe/tests/test_data/temp_files
