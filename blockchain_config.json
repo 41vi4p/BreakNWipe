@@ -1,0 +1,28 @@
+{
+  "network": {
+    "name": "sepolia",
+    "rpc_url": "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "chain_id": 11155111,
+    "explorer_url": "https://sepolia.etherscan.io"
+  },
+  "contract": {
+    "address": "0x23183BCD67664eD995ec06FF31289A7d3b0897e3",
+    "name": "ReportRegistryWithJson",
+    "deployment_block": null
+  },
+  "datawipe": {
+    "base_url": "https://datawipe.vercel.app",
+    "verification_endpoint": "/api/verify",
+    "enabled": true
+  },
+  "breaknwipe": {
+    "auto_blockchain_store": true,
+    "qr_include_blockchain": true,
+    "verification_url_template": "https://datawipe.vercel.app?hash={hash}",
+    "storage_method": "onchain"
+  },
+  "gas": {
+    "limit": 500000,
+    "price_gwei": 20
+  }
+}

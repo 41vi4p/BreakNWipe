@@ -25,6 +25,7 @@ from reportlab.graphics import renderPDF
 from .report import WipeReport, ReportFormat
 from .signature import DigitalSigner, CertificateStore
 from .qr import QRGenerator
+from .blockchain import BlockchainCertificateStore, BlockchainConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +33,13 @@ logger = logging.getLogger(__name__)
 class CertificateGenerator:
     """Generates wipe certificates in various formats."""
 
-    def __init__(self, output_directory: str = None):
+    def __init__(self, output_directory: str = None, enable_blockchain: bool = True):
         """
         Initialize certificate generator.
 
         Args:
             output_directory: Directory to save certificates
+            enable_blockchain: Whether to enable blockchain functionality
         """
         if output_directory is None:
             output_directory = os.path.expanduser("~/breaknwipe_reports")
@@ -49,11 +51,22 @@ class CertificateGenerator:
         self.cert_store = CertificateStore()
         self.qr_generator = QRGenerator()
 
+        # Initialize blockchain functionality
+        self.blockchain_enabled = enable_blockchain
+        self.blockchain_store = None
+        if enable_blockchain:
+            try:
+                self.blockchain_store = BlockchainCertificateStore()
+                logger.info("Blockchain functionality enabled")
+            except Exception as e:
+                logger.warning(f"Blockchain functionality disabled: {e}")
+                self.blockchain_enabled = False
+
         # Initialize signing keys if they don't exist
         self._initialize_signing_keys()
 
     def generate_certificate(self, report: WipeReport, formats: List[ReportFormat] = None,
-                           include_qr: bool = True) -> Dict[str, str]:
+                           include_qr: bool = True, store_on_blockchain: bool = None) -> Dict[str, str]:
         """
         Generate certificate in specified formats.
 
@@ -61,22 +74,39 @@ class CertificateGenerator:
             report: WipeReport to generate certificate from
             formats: List of formats to generate (default: PDF and JSON)
             include_qr: Whether to include QR code
+            store_on_blockchain: Whether to store on blockchain (default: use blockchain_enabled setting)
 
         Returns:
-            Dictionary mapping format to file path
+            Dictionary mapping format to file path with blockchain info
         """
         if formats is None:
             formats = [ReportFormat.PDF, ReportFormat.JSON]
 
+        if store_on_blockchain is None:
+            store_on_blockchain = self.blockchain_enabled
+
         # Sign the report
         self._sign_report(report)
+
+        # Store on blockchain if enabled
+        blockchain_result = None
+        if store_on_blockchain and self.blockchain_store:
+            try:
+                logger.info("Storing certificate on blockchain...")
+                blockchain_result = self.blockchain_store.store_certificate(report)
+                if blockchain_result['success']:
+                    logger.info(f"Certificate stored on blockchain: {blockchain_result.get('transaction_hash', 'Already exists')}")
+                else:
+                    logger.error(f"Failed to store on blockchain: {blockchain_result.get('error')}")
+            except Exception as e:
+                logger.error(f"Blockchain storage failed: {e}")
 
         # Generate QR code data if requested
         qr_data = None
         if include_qr:
-            qr_data = self._generate_qr_data(report)
+            qr_data = self._generate_qr_data(report, blockchain_result)
 
-        generated_files = {}
+        generated_files = {'blockchain_result': blockchain_result}
 
         for format_type in formats:
             try:
@@ -134,17 +164,24 @@ class CertificateGenerator:
         report.digital_signature = signature_data['signature']
         report.certificate_hash = report_hash
 
-    def _generate_qr_data(self, report: WipeReport) -> str:
-        """Generate QR code data for report."""
-        qr_data = {
-            'report_id': report.report_id,
-            'device_serial': report.device_info.serial if report.device_info else 'Unknown',
-            'success': report.success,
-            'algorithm': report.algorithm_used,
-            'timestamp': report.generated_at,
-            'hash': report.certificate_hash,
-            'verify_url': f'https://verify.breaknwipe.org/{report.report_id}'
-        }
+    def _generate_qr_data(self, report: WipeReport, blockchain_result: Optional[Dict[str, Any]] = None) -> str:
+        """Generate QR code data for report with optional blockchain information."""
+        if blockchain_result and blockchain_result.get('success') and self.blockchain_store:
+            # Generate blockchain-enhanced QR data
+            qr_data = self.blockchain_store.create_blockchain_qr_data(report, blockchain_result)
+        else:
+            # Generate traditional QR data
+            qr_data = {
+                'type': 'breaknwipe_certificate',
+                'version': '1.0',
+                'report_id': report.report_id,
+                'device_serial': report.device_info.serial if report.device_info else 'Unknown',
+                'success': report.success,
+                'algorithm': report.algorithm_used,
+                'timestamp': int(report.generated_at),
+                'hash': report.certificate_hash,
+                'verify_url': f'https://datawipe.vercel.app?report_id={report.report_id}'
+            }
 
         return json.dumps(qr_data, separators=(',', ':'))
 
@@ -615,3 +652,56 @@ class CertificateGenerator:
             logger.error(f"Certificate verification failed: {e}")
 
         return result
+
+    def verify_certificate_blockchain(self, report_hash: str) -> Dict[str, Any]:
+        """
+        Verify a certificate using blockchain.
+
+        Args:
+            report_hash: Hash of the report to verify
+
+        Returns:
+            Blockchain verification result dictionary
+        """
+        if not self.blockchain_enabled or not self.blockchain_store:
+            return {
+                'valid': False,
+                'blockchain_enabled': False,
+                'error': 'Blockchain functionality not available'
+            }
+
+        try:
+            return self.blockchain_store.verify_certificate(report_hash)
+        except Exception as e:
+            logger.error(f"Blockchain verification failed: {e}")
+            return {
+                'valid': False,
+                'blockchain_enabled': True,
+                'error': str(e)
+            }
+
+    def get_blockchain_status(self) -> Dict[str, Any]:
+        """Get current blockchain connection status."""
+        if not self.blockchain_enabled or not self.blockchain_store:
+            return {
+                'enabled': False,
+                'configured': False,
+                'connected': False
+            }
+
+        try:
+            network_info = self.blockchain_store.get_network_info()
+            config = self.blockchain_store.config
+
+            return {
+                'enabled': True,
+                'configured': config.is_configured(),
+                'missing_config': config.get_missing_config(),
+                'network_info': network_info
+            }
+        except Exception as e:
+            return {
+                'enabled': True,
+                'configured': False,
+                'error': str(e)
+            }

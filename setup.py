@@ -85,5 +85,10 @@ setup(
             'websockets>=11.0.0',
             'aiofiles>=23.2.1',
         ],
+        'blockchain': [
+            'web3>=6.0.0',
+            'eth-account>=0.8.0',
+            'requests>=2.28.0',
+        ],
     },
 )
