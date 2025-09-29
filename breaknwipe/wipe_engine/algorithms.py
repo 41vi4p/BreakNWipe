@@ -234,10 +234,10 @@ class WipeAlgorithm:
         self._passes = [
             WipePass(1, self._generate_rea_pattern(), "REA-Custom Phase 1 - Key Generation"),
             WipePass(2, self._generate_rea_pattern(), "REA-Custom Phase 2 - Primary Encryption"),
-            WipePass(3, self._generate_rea_pattern(), "REA-Custom Phase 3 - Secondary Encryption"),
-            WipePass(4, self._generate_random_block(), "REA-Custom Phase 4 - Random Overwrite"),
-            WipePass(5, b'\\x00' * self.block_size, "REA-Custom Phase 5 - Zero Overwrite"),
-            WipePass(6, self._generate_random_block(), "REA-Custom Phase 6 - Final Random", verify=True)
+            # WipePass(3, self._generate_rea_pattern(), "REA-Custom Phase 3 - Secondary Encryption"),
+            # WipePass(4, self._generate_random_block(), "REA-Custom Phase 4 - Random Overwrite"),
+            WipePass(3, b'\\x00' * self.block_size, "REA-Custom Phase 5 - Zero Overwrite", verify=True),
+            # WipePass(6, self._generate_random_block(), "REA-Custom Phase 6 - Final Random", verify=True)
         ]
 
     def _generate_rea_pattern(self) -> bytes:
