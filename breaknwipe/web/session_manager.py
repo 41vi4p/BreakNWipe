@@ -102,7 +102,7 @@ class WipeSessionManager:
             status=WipeSessionStatus.PENDING,
             progress_percent=0.0,
             current_pass=0,
-            total_passes=self._get_total_passes(wipe_request.algorithm),
+            total_passes=self._get_total_passes(wipe_request.algorithm, wipe_request),
             speed_mbps=0.0,
             data_processed=0,
             started_at=datetime.now(),
@@ -134,7 +134,7 @@ class WipeSessionManager:
             }
             wipe_dict = {
                 'algorithm': wipe_request.algorithm.value,
-                'total_passes': self._get_total_passes(wipe_request.algorithm),
+                'total_passes': self._get_total_passes(wipe_request.algorithm, wipe_request),
                 'verify': wipe_request.verify,
                 'generate_certificate': wipe_request.generate_certificate
             }
@@ -189,7 +189,7 @@ class WipeSessionManager:
                 except ValueError:
                     pass
 
-    def _get_total_passes(self, algorithm: WipeAlgorithm) -> int:
+    def _get_total_passes(self, algorithm: WipeAlgorithm, wipe_request: WipeRequest = None) -> int:
         """Get total number of passes for an algorithm."""
         algorithm_passes = {
             WipeAlgorithm.NIST_CLEAR: 1,
@@ -203,8 +203,26 @@ class WipeSessionManager:
             WipeAlgorithm.REA_BASIC: 5,
             WipeAlgorithm.REA_MULTICHAIN: 8,
             WipeAlgorithm.REA_EXTREME: 32,
+            WipeAlgorithm.REA_FAST: 2,
             WipeAlgorithm.REA_CUSTOM: 6
         }
+
+        # Calculate dynamic passes for REA Custom
+        if algorithm == WipeAlgorithm.REA_CUSTOM and wipe_request:
+            encryption_layers = wipe_request.encryption_layers or 2
+            overwrite_algorithm = wipe_request.overwrite_algorithm or 'nist-clear'
+
+            # Calculate overwrite passes
+            overwrite_passes = 1
+            if overwrite_algorithm in ['nist-purge', 'dod-3pass', 'random']:
+                overwrite_passes = 3
+
+            return encryption_layers + overwrite_passes
+
+        # Handle custom passes for random algorithm
+        if algorithm == WipeAlgorithm.RANDOM and wipe_request and wipe_request.custom_passes:
+            return wipe_request.custom_passes
+
         return algorithm_passes.get(algorithm, 3)
 
     def _execute_wipe(self, session_id: str):
@@ -263,11 +281,26 @@ class WipeSessionManager:
                 WipeAlgorithm.REA_BASIC: 'rea-basic',
                 WipeAlgorithm.REA_MULTICHAIN: 'rea-multichain',
                 WipeAlgorithm.REA_EXTREME: 'rea-extreme',
+                WipeAlgorithm.REA_FAST: 'rea-fast',
                 WipeAlgorithm.REA_CUSTOM: 'rea-custom'
             }
 
             algorithm_name = algorithm_mapping.get(session.wipe_request.algorithm, 'nist-clear')
-            algorithm = create_algorithm(algorithm_name)
+
+            # Prepare algorithm creation parameters
+            algo_kwargs = {}
+
+            # Add custom passes for random algorithm
+            if session.wipe_request.algorithm == WipeAlgorithm.RANDOM and session.wipe_request.custom_passes:
+                algo_kwargs['passes'] = session.wipe_request.custom_passes
+
+            # Add REA Custom parameters
+            if session.wipe_request.algorithm == WipeAlgorithm.REA_CUSTOM:
+                algo_kwargs['encryption_layers'] = session.wipe_request.encryption_layers or 2
+                algo_kwargs['overwrite_algorithm'] = session.wipe_request.overwrite_algorithm or 'nist-clear'
+                algo_kwargs['fast_mode'] = session.wipe_request.fast_mode or False
+
+            algorithm = create_algorithm(algorithm_name, **algo_kwargs)
 
             # Create device handler (for hardware operations if needed)
             device_handler = DeviceHandler()

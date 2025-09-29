@@ -31,6 +31,7 @@ class AlgorithmType(Enum):
     REA_MULTICHAIN = "rea-multichain"
     REA_EXTREME = "rea-extreme"
     REA_CUSTOM = "rea-custom"
+    REA_FAST = "rea-fast"
 
 
 @dataclass
@@ -82,6 +83,8 @@ class WipeAlgorithm:
             self._setup_rea_extreme()
         elif self.algorithm_type == AlgorithmType.REA_CUSTOM:
             self._setup_rea_custom()
+        elif self.algorithm_type == AlgorithmType.REA_FAST:
+            self._setup_rea_fast()
 
     def _setup_nist_clear(self):
         """Setup NIST SP 800-88 Clear method (single pass)."""
@@ -234,11 +237,84 @@ class WipeAlgorithm:
         self._passes = [
             WipePass(1, self._generate_rea_pattern(), "REA-Custom Phase 1 - Key Generation"),
             WipePass(2, self._generate_rea_pattern(), "REA-Custom Phase 2 - Primary Encryption"),
-            # WipePass(3, self._generate_rea_pattern(), "REA-Custom Phase 3 - Secondary Encryption"),
-            # WipePass(4, self._generate_random_block(), "REA-Custom Phase 4 - Random Overwrite"),
-            WipePass(3, b'\\x00' * self.block_size, "REA-Custom Phase 5 - Zero Overwrite", verify=True),
-            # WipePass(6, self._generate_random_block(), "REA-Custom Phase 6 - Final Random", verify=True)
+            WipePass(3, b'\\x00' * self.block_size, "REA-Custom Phase 3 - Zero Overwrite", verify=True),
         ]
+
+    def _setup_rea_fast(self):
+        """Setup REA Fast - Optimized for speed while maintaining security."""
+        self._passes = [
+            WipePass(1, self._generate_random_block(), "REA-Fast Phase 1 - Fast Encryption"),
+            WipePass(2, b'\\x00' * self.block_size, "REA-Fast Phase 2 - Zero Overwrite", verify=True),
+        ]
+
+    def customize_rea_algorithm(self, encryption_layers: int = 2, overwrite_algorithm: str = "nist-clear", fast_mode: bool = False):
+        """
+        Customize REA algorithm with user-selected parameters.
+
+        Args:
+            encryption_layers: Number of encryption passes (1-7, default: 2)
+            overwrite_algorithm: Which algorithm to use for overwrite phase
+                Options: "nist-clear", "nist-purge", "dod-3pass", "random", "zeros"
+            fast_mode: If True, reduces encryption complexity for speed
+        """
+        if self.algorithm_type != AlgorithmType.REA_CUSTOM:
+            raise ValueError("Can only customize REA_CUSTOM algorithm type")
+
+        # Validate parameters
+        encryption_layers = max(1, min(7, encryption_layers))
+
+        # Build encryption phase
+        self._passes = []
+        for i in range(1, encryption_layers + 1):
+            if fast_mode:
+                # Use simpler random data for speed
+                pattern = self._generate_random_block()
+                desc = f"REA-Custom Layer {i} - Fast Encryption"
+            else:
+                # Use full REA pattern for security
+                pattern = self._generate_rea_pattern()
+                desc = f"REA-Custom Layer {i} - Secure Encryption"
+
+            self._passes.append(WipePass(i, pattern, desc))
+
+        # Add overwrite phase based on selected algorithm
+        pass_offset = encryption_layers
+
+        if overwrite_algorithm == "nist-clear":
+            self._passes.append(
+                WipePass(pass_offset + 1, b'\\x00' * self.block_size,
+                        "REA-Custom Overwrite - NIST Clear", verify=True)
+            )
+        elif overwrite_algorithm == "nist-purge":
+            self._passes.extend([
+                WipePass(pass_offset + 1, b'\\x00' * self.block_size, "REA-Custom Overwrite - Zeros"),
+                WipePass(pass_offset + 2, b'\\xFF' * self.block_size, "REA-Custom Overwrite - Ones"),
+                WipePass(pass_offset + 3, self._generate_random_block(), "REA-Custom Overwrite - Random", verify=True)
+            ])
+        elif overwrite_algorithm == "dod-3pass":
+            self._passes.extend([
+                WipePass(pass_offset + 1, b'\\x00' * self.block_size, "REA-Custom Overwrite - DoD Zeros"),
+                WipePass(pass_offset + 2, b'\\xFF' * self.block_size, "REA-Custom Overwrite - DoD Ones"),
+                WipePass(pass_offset + 3, self._generate_random_block(), "REA-Custom Overwrite - DoD Random", verify=True)
+            ])
+        elif overwrite_algorithm == "random":
+            for i in range(3):
+                self._passes.append(
+                    WipePass(pass_offset + i + 1, self._generate_random_block(),
+                           f"REA-Custom Overwrite - Random Pass {i + 1}")
+                )
+            self._passes[-1].verify = True  # Verify last pass
+        elif overwrite_algorithm == "zeros":
+            self._passes.append(
+                WipePass(pass_offset + 1, b'\\x00' * self.block_size,
+                        "REA-Custom Overwrite - Zero Fill", verify=True)
+            )
+        else:
+            # Default to NIST Clear
+            self._passes.append(
+                WipePass(pass_offset + 1, b'\\x00' * self.block_size,
+                        "REA-Custom Overwrite - Default Zero", verify=True)
+            )
 
     def _generate_rea_pattern(self) -> bytes:
         """
@@ -246,6 +322,7 @@ class WipeAlgorithm:
 
         This simulates the REA process by creating cryptographically secure
         random data with additional entropy sources and key rotation.
+        Optimized for performance while maintaining security.
         """
         import hashlib
         import time
@@ -253,29 +330,34 @@ class WipeAlgorithm:
         # Generate base random data
         base_random = os.urandom(self.block_size)
 
-        # Add temporal entropy
-        timestamp = str(time.time_ns()).encode()
+        # Add temporal entropy (reduced precision for performance)
+        timestamp = str(int(time.time() * 1000)).encode()
 
-        # Create hash-based key rotation
+        # Create hash-based key rotation (optimized)
         hasher = hashlib.sha256()
-        hasher.update(base_random)
+        hasher.update(base_random[:256])  # Use only first 256 bytes for hash
         hasher.update(timestamp)
-        hasher.update(os.urandom(32))  # Additional entropy
+        hasher.update(os.urandom(16))  # Reduced entropy size
 
         key_material = hasher.digest()
 
-        # XOR the base random data with rotated key material for enhanced randomization
+        # XOR the base random data with rotated key material (vectorized approach)
         result = bytearray(base_random)
-        for i in range(len(result)):
-            key_byte = key_material[i % len(key_material)]
-            result[i] ^= key_byte
+        key_len = len(key_material)
 
-        # Add additional randomization layer
-        for i in range(0, len(result), 64):
-            chunk_random = os.urandom(min(64, len(result) - i))
-            for j, byte_val in enumerate(chunk_random):
-                if i + j < len(result):
-                    result[i + j] ^= byte_val
+        # Process in larger chunks for better performance
+        for i in range(0, len(result), key_len):
+            chunk_end = min(i + key_len, len(result))
+            chunk_size = chunk_end - i
+            for j in range(chunk_size):
+                result[i + j] ^= key_material[j]
+
+        # Simplified additional randomization layer
+        if len(result) > 1024:  # Only for larger blocks
+            chunk_random = os.urandom(64)
+            for i in range(0, len(result), len(chunk_random)):
+                for j in range(min(len(chunk_random), len(result) - i)):
+                    result[i + j] ^= chunk_random[j]
 
         return bytes(result)
 
@@ -305,7 +387,8 @@ class WipeAlgorithm:
             AlgorithmType.REA_BASIC: f"REA Basic - Encryption + NIST Clear ({len(self._passes)} passes)",
             AlgorithmType.REA_MULTICHAIN: f"REA Multichain - Multi-layer Encryption + DoD ({len(self._passes)} passes)",
             AlgorithmType.REA_EXTREME: f"REA Extreme - Maximum Encryption + Gutmann ({len(self._passes)} passes)",
-            AlgorithmType.REA_CUSTOM: f"REA Custom - Configurable Encryption ({len(self._passes)} passes)"
+            AlgorithmType.REA_CUSTOM: f"REA Custom - Configurable Encryption ({len(self._passes)} passes)",
+            AlgorithmType.REA_FAST: f"REA Fast - Speed Optimized Encryption ({len(self._passes)} passes)"
         }
         return descriptions.get(self.algorithm_type, "Unknown Algorithm")
 
@@ -324,7 +407,8 @@ class WipeAlgorithm:
             AlgorithmType.REA_BASIC: True,   # Encryption + few passes
             AlgorithmType.REA_MULTICHAIN: True,  # Reasonable pass count
             AlgorithmType.REA_EXTREME: False,    # Too many passes for SSD
-            AlgorithmType.REA_CUSTOM: True       # User responsibility
+            AlgorithmType.REA_CUSTOM: True,      # User responsibility
+            AlgorithmType.REA_FAST: True         # Optimized for speed
         }
         return secure_for_ssd.get(self.algorithm_type, False)
 
@@ -376,7 +460,11 @@ def create_algorithm(algorithm_type: str, **kwargs) -> WipeAlgorithm:
 
     Args:
         algorithm_type: String identifier for algorithm type
-        **kwargs: Additional parameters (e.g., passes for random algorithm)
+        **kwargs: Additional parameters:
+            - passes: Number of passes for random algorithm
+            - encryption_layers: Number of encryption layers for REA custom (1-7)
+            - overwrite_algorithm: Overwrite algorithm for REA custom
+            - fast_mode: Use fast mode for REA custom (reduces encryption complexity)
 
     Returns:
         Configured WipeAlgorithm instance
@@ -386,13 +474,25 @@ def create_algorithm(algorithm_type: str, **kwargs) -> WipeAlgorithm:
     except ValueError:
         raise ValueError(f"Unsupported algorithm type: {algorithm_type}")
 
+    algorithm = WipeAlgorithm(algo_enum)
+
     if algo_enum == AlgorithmType.RANDOM:
         passes = kwargs.get('passes', 3)
-        algorithm = WipeAlgorithm(algo_enum)
         algorithm._setup_random(passes)
-        return algorithm
+    elif algo_enum == AlgorithmType.REA_CUSTOM:
+        # Apply customizations if provided
+        encryption_layers = kwargs.get('encryption_layers', 2)
+        overwrite_algorithm = kwargs.get('overwrite_algorithm', 'nist-clear')
+        fast_mode = kwargs.get('fast_mode', False)
 
-    return WipeAlgorithm(algo_enum)
+        if any([encryption_layers != 2, overwrite_algorithm != 'nist-clear', fast_mode]):
+            algorithm.customize_rea_algorithm(
+                encryption_layers=encryption_layers,
+                overwrite_algorithm=overwrite_algorithm,
+                fast_mode=fast_mode
+            )
+
+    return algorithm
 
 
 def list_available_algorithms() -> List[dict]:
@@ -431,6 +531,7 @@ def _get_algorithm_category(algo_type: AlgorithmType) -> str:
         AlgorithmType.REA_BASIC: "Cryptographic Erase",
         AlgorithmType.REA_MULTICHAIN: "Cryptographic Erase",
         AlgorithmType.REA_EXTREME: "Cryptographic Erase",
-        AlgorithmType.REA_CUSTOM: "Cryptographic Erase"
+        AlgorithmType.REA_CUSTOM: "Cryptographic Erase",
+        AlgorithmType.REA_FAST: "Cryptographic Erase"
     }
     return categories.get(algo_type, "Unknown")

@@ -176,11 +176,53 @@
                                 <div class="security-level" style="color: #8e44ad;">🔒🔒🔒 Extreme</div>
                             </div>
 
+                            <div class="device-card" data-algo="rea-fast" title="Speed-optimized encryption">
+                                <div class="device-icon">⚡</div>
+                                <h3>REA Fast</h3>
+                                <p>Speed-optimized encryption (2 passes)</p>
+                                <div class="security-level" style="color: #f39c12;">🚀 Fast</div>
+                            </div>
+
                             <div class="device-card" data-algo="rea-custom" title="Custom encryption parameters">
                                 <div class="device-icon">🛠️</div>
                                 <h3>REA Custom</h3>
                                 <p>Custom encryption + selectable overwrite</p>
                                 <div class="security-level" style="color: #9b59b6;">⚙️ Custom</div>
+                            </div>
+                        </div>
+
+                        <!-- REA Custom Configuration Panel -->
+                        <div id="reaCustomConfig" class="rea-config-panel" style="display: none;">
+                            <h4>REA Custom Configuration</h4>
+                            <div class="config-options">
+                                <div class="config-group">
+                                    <label for="encryptionLayers">Encryption Layers (1-7):</label>
+                                    <input type="range" id="encryptionLayers" min="1" max="7" value="2">
+                                    <span id="encryptionLayersValue">2</span>
+                                </div>
+
+                                <div class="config-group">
+                                    <label for="overwriteAlgorithm">Overwrite Algorithm:</label>
+                                    <select id="overwriteAlgorithm">
+                                        <option value="zeros">Zero Fill (Fastest - 1 pass)</option>
+                                        <option value="nist-clear" selected>NIST Clear (Fast - 1 pass)</option>
+                                        <option value="nist-purge">NIST Purge (Standard - 3 passes)</option>
+                                        <option value="dod-3pass">DoD 3-Pass (Secure - 3 passes)</option>
+                                        <option value="random">Random Data (Secure - 3 passes)</option>
+                                    </select>
+                                </div>
+
+                                <div class="config-group">
+                                    <label>
+                                        <input type="checkbox" id="fastMode"> Fast Mode
+                                        <small>Use simpler encryption for faster processing</small>
+                                    </label>
+                                </div>
+
+                                <div class="time-estimate">
+                                    <strong>Estimated Passes: <span id="totalPasses">3</span></strong><br>
+                                    <small>Time: <span id="timeEstimate">~15 minutes for 500GB drive</span></small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -353,6 +395,16 @@
                 document.querySelectorAll('#deepAlgorithmGrid .device-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 selectedAlgorithm = card.dataset.algo;
+
+                // Show REA Custom config panel if REA Custom is selected
+                const reaCustomConfig = document.getElementById('reaCustomConfig');
+                if (selectedAlgorithm === 'rea-custom') {
+                    reaCustomConfig.style.display = 'block';
+                    updateReaCustomEstimate();
+                } else {
+                    reaCustomConfig.style.display = 'none';
+                }
+
                 checkStartButton();
             }
         });
@@ -383,6 +435,53 @@
                 checkStartButton();
             }
         });
+
+        // REA Custom configuration handlers
+        document.getElementById('encryptionLayers')?.addEventListener('input', (e) => {
+            document.getElementById('encryptionLayersValue').textContent = e.target.value;
+            updateReaCustomEstimate();
+        });
+
+        document.getElementById('overwriteAlgorithm')?.addEventListener('change', updateReaCustomEstimate);
+        document.getElementById('fastMode')?.addEventListener('change', updateReaCustomEstimate);
+
+        function updateReaCustomEstimate() {
+            const encryptionLayers = parseInt(document.getElementById('encryptionLayers')?.value || 2);
+            const overwriteAlgorithm = document.getElementById('overwriteAlgorithm')?.value || 'nist-clear';
+            const fastMode = document.getElementById('fastMode')?.checked || false;
+
+            // Calculate total passes
+            let overwritePasses = 1;
+            switch (overwriteAlgorithm) {
+                case 'zeros':
+                case 'nist-clear':
+                    overwritePasses = 1;
+                    break;
+                case 'nist-purge':
+                case 'dod-3pass':
+                case 'random':
+                    overwritePasses = 3;
+                    break;
+            }
+
+            const totalPasses = encryptionLayers + overwritePasses;
+            document.getElementById('totalPasses').textContent = totalPasses;
+
+            // Estimate time (rough calculation)
+            const baseTimePerPass = fastMode ? 3 : 5; // minutes per pass for 500GB
+            const estimatedTime = totalPasses * baseTimePerPass;
+
+            let timeText;
+            if (estimatedTime < 60) {
+                timeText = `~${estimatedTime} minutes for 500GB drive`;
+            } else {
+                const hours = Math.floor(estimatedTime / 60);
+                const minutes = estimatedTime % 60;
+                timeText = `~${hours}h ${minutes}m for 500GB drive`;
+            }
+
+            document.getElementById('timeEstimate').textContent = timeText;
+        }
 
         function showMobileInstructions(mode) {
             const instructionsDiv = document.getElementById('mobileInstructions');
@@ -563,6 +662,13 @@
                         wipe_mode: selectedWipeMode,
                         custom_passes: customPasses
                     };
+
+                    // Add REA Custom configuration if selected
+                    if (selectedAlgorithm === 'rea-custom') {
+                        wipeRequest.encryption_layers = parseInt(document.getElementById('encryptionLayers')?.value || 2);
+                        wipeRequest.overwrite_algorithm = document.getElementById('overwriteAlgorithm')?.value || 'nist-clear';
+                        wipeRequest.fast_mode = document.getElementById('fastMode')?.checked || false;
+                    }
 
                     const response = await fetch('/api/wipe/start', {
                         method: 'POST',

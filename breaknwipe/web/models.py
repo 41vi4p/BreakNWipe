@@ -43,6 +43,7 @@ class WipeAlgorithm(str, Enum):
     REA_BASIC = "rea-basic"
     REA_MULTICHAIN = "rea-multichain"
     REA_EXTREME = "rea-extreme"
+    REA_FAST = "rea-fast"
     REA_CUSTOM = "rea-custom"
 
 
@@ -83,6 +84,11 @@ class WipeRequest(BaseModel):
     passes: Optional[int] = Field(default=None, description="Number of passes for custom algorithms")
     wipe_mode: Optional[WipeMode] = Field(default=WipeMode.QUICK, description="Wipe mode selection")
     custom_passes: Optional[int] = Field(default=None, description="Custom number of passes")
+
+    # REA Custom Parameters
+    encryption_layers: Optional[int] = Field(default=2, description="Number of encryption layers for REA Custom (1-7)")
+    overwrite_algorithm: Optional[str] = Field(default="nist-clear", description="Overwrite algorithm for REA Custom")
+    fast_mode: Optional[bool] = Field(default=False, description="Use fast mode for REA Custom encryption")
 
 
 class MobileWipeRequest(BaseModel):
