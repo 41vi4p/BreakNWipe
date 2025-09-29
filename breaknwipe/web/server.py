@@ -595,6 +595,32 @@ class WebServer:
         if session_id not in self.websocket_connections:
             return
 
+        # Get session to retrieve algorithm information
+        session = self.session_manager.get_session(session_id)
+        algorithm_description = "Unknown Algorithm"
+
+        if session:
+            # Get algorithm description using the same logic as the algorithms.py
+            from ..wipe_engine.algorithms import create_algorithm, AlgorithmType
+
+            # Map WipeAlgorithm enum to string for create_algorithm
+            algorithm_mapping = {
+                "nist-clear": "NIST SP 800-88 Clear (1 pass)",
+                "nist-purge": "NIST SP 800-88 Purge (3 passes)",
+                "dod-3pass": "DoD 5220.22-M Standard (3 passes)",
+                "dod-7pass": "DoD 5220.22-M Enhanced (7 passes)",
+                "gutmann": "Gutmann Method (35 passes)",
+                "random": "Random Data (3 passes)",
+                "zeros": "Zero Fill (1 pass)",
+                "custom": "Custom Algorithm",
+                "rea-basic": "REA Basic - Encryption + NIST Clear (5 passes)",
+                "rea-multichain": "REA Multichain - Multi-layer Encryption + DoD (8 passes)",
+                "rea-extreme": "REA Extreme - Maximum Encryption + Gutmann (32 passes)",
+                "rea-custom": "REA Custom - Configurable Encryption (6 passes)"
+            }
+
+            algorithm_description = algorithm_mapping.get(session.wipe_request.algorithm.value, "Unknown Algorithm")
+
         message = WebSocketMessage(
             type="progress_update",
             session_id=session_id,
@@ -605,7 +631,8 @@ class WebServer:
                 "total_passes": progress.total_passes,
                 "speed_mbps": progress.speed_mbps,
                 "data_processed": progress.data_processed,
-                "estimated_remaining": progress.estimated_remaining
+                "estimated_remaining": progress.estimated_remaining,
+                "algorithm_description": algorithm_description
             }
         )
 

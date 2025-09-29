@@ -112,6 +112,7 @@
         let currentProgress = 0;
         let startTime = null;
         let timeElapsedInterval = null;
+        let currentData = null; // Store current progress data
 
         // Time formatting function
         function formatTime(seconds) {
@@ -131,8 +132,22 @@
                 const elapsed = (Date.now() - startTime) / 1000;
                 document.getElementById('timeElapsed').textContent = formatTime(elapsed);
 
-                // Update time elapsed circular progress (based on a reasonable max time, e.g., 3 hours = 10800 seconds)
-                const maxTime = 10800; // 3 hours
+                // Update time elapsed circular progress (dynamic based on algorithm complexity)
+                let maxTime = 7200; // Default 2 hours
+
+                // Adjust max time based on algorithm and passes
+                if (currentData && currentData.total_passes) {
+                    if (currentData.total_passes >= 30) {
+                        maxTime = 14400; // 4 hours for Gutmann/REA Extreme
+                    } else if (currentData.total_passes >= 8) {
+                        maxTime = 10800; // 3 hours for REA Multichain
+                    } else if (currentData.total_passes >= 5) {
+                        maxTime = 7200;  // 2 hours for REA Basic/DoD 7-pass
+                    } else {
+                        maxTime = 3600;  // 1 hour for simple algorithms
+                    }
+                }
+
                 const timeProgress = Math.min(100, (elapsed / maxTime) * 100);
                 updateCircularProgress('timeElapsedProgress', timeProgress);
             }, 1000);
@@ -158,16 +173,20 @@
 
             document.getElementById('selectedDeviceName').textContent = selectedDevice.model;
 
-            // Map algorithm to display name
+            // Initialize with basic algorithm name, will be updated with proper description from server
             const algorithmMap = {
-                'nist-clear': 'NIST Clear (1-Pass)',
-                'nist-purge': 'NIST Purge (3-Pass)',
-                'dod-3pass': 'DoD 3-Pass (3-Pass)',
-                'dod-7pass': 'DoD 7-Pass (7-Pass)',
-                'gutmann': 'Gutmann Method (35-Pass)',
-                'random': 'Random Data (3-Pass)',
-                'zeros': 'Zero Fill (1-Pass)',
-                'custom': 'Custom Algorithm (3-Pass)'
+                'nist-clear': 'NIST Clear',
+                'nist-purge': 'NIST Purge',
+                'dod-3pass': 'DoD 3-Pass',
+                'dod-7pass': 'DoD 7-Pass',
+                'gutmann': 'Gutmann Method',
+                'random': 'Random Data',
+                'zeros': 'Zero Fill',
+                'custom': 'Custom Algorithm',
+                'rea-basic': 'REA Basic',
+                'rea-multichain': 'REA Multichain',
+                'rea-extreme': 'REA Extreme',
+                'rea-custom': 'REA Custom'
             };
 
             document.getElementById('securityLevel').textContent = algorithmMap[selectedAlgorithm] || 'Unknown';
@@ -212,6 +231,7 @@
 
         function updateProgress(data) {
             currentProgress = data.progress_percent;
+            currentData = data; // Store current data for time calculations
 
             // Start timer on first progress update
             if (!startTime && data.status === 'running') {
@@ -228,35 +248,118 @@
             // Update cleaning speed
             document.getElementById('cleaningSpeed').textContent = data.speed_mbps.toFixed(1) + ' MB/s';
 
-            // Update speed circular progress (normalize to 0-100 range, assuming max 100 MB/s)
-            const speedProgress = Math.min(100, (data.speed_mbps / 100) * 100);
+            // Update speed circular progress (normalize to 0-100 range, assuming max 150 MB/s for better scaling)
+            const maxSpeed = 150; // MB/s
+            const speedProgress = Math.min(100, (data.speed_mbps / maxSpeed) * 100);
             updateCircularProgress('speedProgress', speedProgress);
 
             // Update data processed
             const processedGB = (data.data_processed / (1024 * 1024 * 1024)).toFixed(1);
             document.getElementById('dataProcessed').textContent = processedGB + ' GB';
 
-            // Update data circular progress
-            updateCircularProgress('dataProgress', currentProgress);
+            // Update data circular progress (accurate data processing calculation)
+            let dataProgress = currentProgress;
+            if (selectedDevice && selectedDevice.capacity && data.data_processed) {
+                const totalCapacityBytes = selectedDevice.capacity;
+                const totalDataToProcess = totalCapacityBytes * (data.total_passes || 1);
+                dataProgress = Math.min(100, (data.data_processed / totalDataToProcess) * 100);
+
+                // If data progress seems incorrect, fall back to estimated progress
+                if (dataProgress > currentProgress + 10 || dataProgress < currentProgress - 10) {
+                    dataProgress = currentProgress;
+                }
+            }
+            updateCircularProgress('dataProgress', dataProgress);
 
             // Update current pass
             document.getElementById('currentPass').textContent = `${data.current_pass}/${data.total_passes}`;
 
-            // Update pass circular progress
-            const passProgress = data.total_passes > 0 ? ((data.current_pass - 1) / (data.total_passes - 1)) * 100 : 0;
-            updateCircularProgress('passProgress', Math.min(100, passProgress));
+            // Update pass circular progress (clear and simple approach)
+            let passProgress = 0;
+            if (data.total_passes > 0 && data.current_pass > 0) {
+                // Validate data consistency
+                if (data.current_pass > data.total_passes) {
+                    // Handle edge case where current_pass might exceed total
+                    passProgress = 100;
+                } else {
+                    // Calculate what percentage each pass represents
+                    const progressPerPass = 100 / data.total_passes;
 
-            // Security level progress (gradually increases with overall progress)
-            const securityProgress = Math.min(100, currentProgress);
-            updateCircularProgress('securityProgress', securityProgress);
+                    // Completed passes (full circles)
+                    const completedPasses = Math.max(0, data.current_pass - 1);
+                    const completedPassProgress = completedPasses * progressPerPass;
+
+                    // Current pass progress estimation
+                    const remainingProgress = Math.max(0, currentProgress - completedPassProgress);
+                    const currentPassProgress = Math.min(progressPerPass, remainingProgress);
+
+                    // Total pass progress
+                    passProgress = completedPassProgress + currentPassProgress;
+
+                    // Ensure pass progress doesn't exceed overall progress significantly
+                    if (passProgress > currentProgress + progressPerPass) {
+                        passProgress = currentProgress;
+                    }
+
+                    // Debug logging
+                    console.log(`Pass Progress: ${data.current_pass}/${data.total_passes} (${passProgress.toFixed(1)}% of circle)`);
+                }
+            }
+            updateCircularProgress('passProgress', Math.min(100, Math.max(0, passProgress)));
+
+            // Update security level with algorithm description if available
+            if (data.algorithm_description) {
+                document.getElementById('securityLevel').textContent = data.algorithm_description;
+            }
+
+            // Security level progress (reflects algorithm complexity and completion)
+            let securityProgress = 0;
+            if (data.algorithm_description) {
+                // Map algorithm types to base security levels
+                const algorithmSecurityMap = {
+                    'REA Extreme': 95,
+                    'REA Multichain': 85,
+                    'REA Basic': 75,
+                    'REA Custom': 80,
+                    'Gutmann Method': 90,
+                    'DoD 5220.22-M Enhanced': 80,
+                    'DoD 5220.22-M Standard': 70,
+                    'NIST SP 800-88 Purge': 65,
+                    'NIST SP 800-88 Clear': 50
+                };
+
+                let baseSecurityLevel = 60; // Default
+                for (const [algName, secLevel] of Object.entries(algorithmSecurityMap)) {
+                    if (data.algorithm_description.includes(algName)) {
+                        baseSecurityLevel = secLevel;
+                        break;
+                    }
+                }
+
+                // Security increases as wipe progresses
+                securityProgress = (baseSecurityLevel * currentProgress) / 100;
+            } else {
+                securityProgress = currentProgress * 0.6; // Default lower security
+            }
+            updateCircularProgress('securityProgress', Math.min(100, securityProgress));
 
             // Update ETA if available
             if (data.estimated_remaining && data.estimated_remaining > 0) {
                 document.getElementById('estimatedTime').textContent = formatTime(data.estimated_remaining);
 
-                // Update ETA circular progress (inverse of remaining time progress)
-                const maxEstimatedTime = 10800; // 3 hours max
-                const etaProgress = Math.max(0, 100 - ((data.estimated_remaining / maxEstimatedTime) * 100));
+                // Update ETA circular progress (dynamic scaling based on algorithm)
+                let maxEstimatedTime = 7200; // Default 2 hours
+                if (data.total_passes >= 30) {
+                    maxEstimatedTime = 14400; // 4 hours for complex algorithms
+                } else if (data.total_passes >= 8) {
+                    maxEstimatedTime = 10800; // 3 hours for multi-pass
+                } else if (data.total_passes >= 5) {
+                    maxEstimatedTime = 7200;  // 2 hours for standard
+                } else {
+                    maxEstimatedTime = 3600;  // 1 hour for simple
+                }
+
+                const etaProgress = Math.max(0, 100 - Math.min(100, (data.estimated_remaining / maxEstimatedTime) * 100));
                 updateCircularProgress('etaProgress', etaProgress);
             } else if (currentProgress > 0) {
                 // Calculate ETA based on elapsed time and progress
@@ -268,8 +371,19 @@
                     if (estimatedRemaining > 0) {
                         document.getElementById('estimatedTime').textContent = formatTime(estimatedRemaining);
 
-                        const maxEstimatedTime = 10800; // 3 hours max
-                        const etaProgress = Math.max(0, 100 - ((estimatedRemaining / maxEstimatedTime) * 100));
+                        // Use same dynamic scaling as above
+                        let maxEstimatedTime = 7200;
+                        if (data.total_passes >= 30) {
+                            maxEstimatedTime = 14400;
+                        } else if (data.total_passes >= 8) {
+                            maxEstimatedTime = 10800;
+                        } else if (data.total_passes >= 5) {
+                            maxEstimatedTime = 7200;
+                        } else {
+                            maxEstimatedTime = 3600;
+                        }
+
+                        const etaProgress = Math.max(0, 100 - Math.min(100, (estimatedRemaining / maxEstimatedTime) * 100));
                         updateCircularProgress('etaProgress', etaProgress);
                     }
                 }
@@ -310,6 +424,11 @@
                     updateCircularProgress('passProgress', 100);
                     updateCircularProgress('timeElapsedProgress', 100);
                     updateCircularProgress('etaProgress', 100);
+
+                    // Update pass display to show completion
+                    if (currentData && currentData.total_passes) {
+                        document.getElementById('currentPass').textContent = `${currentData.total_passes}/${currentData.total_passes}`;
+                    }
 
                     // Set final ETA to 00:00:00
                     document.getElementById('estimatedTime').textContent = '00:00:00';

@@ -199,7 +199,11 @@ class WipeSessionManager:
             WipeAlgorithm.GUTMANN: 35,
             WipeAlgorithm.RANDOM: 3,
             WipeAlgorithm.ZEROS: 1,
-            WipeAlgorithm.CUSTOM: 3
+            WipeAlgorithm.CUSTOM: 3,
+            WipeAlgorithm.REA_BASIC: 5,
+            WipeAlgorithm.REA_MULTICHAIN: 8,
+            WipeAlgorithm.REA_EXTREME: 32,
+            WipeAlgorithm.REA_CUSTOM: 6
         }
         return algorithm_passes.get(algorithm, 3)
 
@@ -255,7 +259,11 @@ class WipeSessionManager:
                 WipeAlgorithm.GUTMANN: 'gutmann',
                 WipeAlgorithm.RANDOM: 'random',
                 WipeAlgorithm.ZEROS: 'zeros',
-                WipeAlgorithm.CUSTOM: 'custom'
+                WipeAlgorithm.CUSTOM: 'custom',
+                WipeAlgorithm.REA_BASIC: 'rea-basic',
+                WipeAlgorithm.REA_MULTICHAIN: 'rea-multichain',
+                WipeAlgorithm.REA_EXTREME: 'rea-extreme',
+                WipeAlgorithm.REA_CUSTOM: 'rea-custom'
             }
 
             algorithm_name = algorithm_mapping.get(session.wipe_request.algorithm, 'nist-clear')

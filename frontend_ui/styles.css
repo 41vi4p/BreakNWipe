@@ -805,13 +805,17 @@ body::before {
 .stat-card {
     background: linear-gradient(135deg, rgba(45,45,45,0.6), rgba(26,26,26,0.5));
     border: 2px solid rgba(85,85,85,0.7);
-    padding: 25px;
+    padding: 20px 15px;
     border-radius: 12px;
     text-align: center;
     transition: var(--transition-smooth);
     position: relative;
     overflow: hidden;
     backdrop-filter: blur(6px);
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 .stat-card:hover {
@@ -871,6 +875,18 @@ body::before {
     color: var(--primary-white);
     margin-bottom: 8px;
     font-family: 'Courier New', monospace;
+}
+
+/* Special styling for security level display */
+#securityLevel {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    line-height: 1.2;
+    text-align: center;
+    padding: 0 5px;
+    word-break: break-word;
+    hyphens: auto;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
 }
 
 .stat-label {
