@@ -186,17 +186,6 @@ remove_config_files() {
     fi
 }
 
-clean_package_cache() {
-    print_status "Cleaning package cache..."
-
-    # Remove pip cache related to BreakNWipe
-    if command -v pip3 &> /dev/null; then
-        pip3 cache purge 2>/dev/null || true
-    fi
-
-    print_success "Package cache cleaned"
-}
-
 remove_dependencies() {
     echo
     read -p "Remove system dependencies that were installed for BreakNWipe? [y/N]: " -n 1 -r
@@ -315,7 +304,6 @@ main() {
     remove_directories
     remove_user_group
     remove_config_files
-    clean_package_cache
     remove_dependencies
     cleanup_temp_files
     verify_removal

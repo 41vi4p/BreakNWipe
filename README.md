@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.4.3-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -112,15 +112,18 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 git clone https://github.com/41vi4p/BreakNWipe.git
 cd BreakNWipe
 
-# Install with uv (recommended — creates a .venv and installs from pyproject.toml/uv.lock)
+# Install system-level dependencies (hdparm, nvme-cli, smartmontools, uv itself, ...)
+sudo ./scripts/install_dependencies.sh
+
+# Then install Python dependencies with uv (creates a .venv from pyproject.toml/uv.lock)
 uv sync
 
-# Or install from source with pip
+# Or install from source with pip instead of uv
 pip install -e .
 pip install -e ".[web,blockchain]"   # with optional extras
 
-# Or full system install (installs dependencies like hdparm, nvme-cli)
-make install-system
+# Or full system-wide install (system deps + dedicated user + systemd service)
+sudo make install-system
 ```
 
 ### Basic Usage
@@ -201,7 +204,8 @@ BreakNWipe/
 ├── scripts/              # Install, packaging, demo & setup scripts
 ├── tests/                # Integration test scripts
 ├── Makefile              # Development commands (make help)
-└── setup.py              # Package configuration
+├── pyproject.toml        # Package metadata & dependencies (uv-managed)
+└── setup.py              # No-op shim kept for `python setup.py sdist`
 ```
 
 ## 🏛️ Standards Compliance

@@ -18,7 +18,7 @@ Use semver: patch bump (`x.y.Z`) for fixes/docs/chores, minor bump (`x.Y.0`) for
 
 ## Commands
 
-Dependencies and the dev environment are managed with [uv](https://docs.astral.sh/uv/); `pyproject.toml` is the single source of truth for metadata and dependencies (`uv.lock` pins exact versions and is committed). `requirements.txt` and `setup.py` are legacy/compat artifacts kept only for the shell scripts under `scripts/` — don't hand-edit dependency versions there, add them to `pyproject.toml` instead (`uv add <pkg>`, `uv add --dev <pkg>` for dev-only tools) and re-run `uv sync`.
+Dependencies and the dev environment are managed with [uv](https://docs.astral.sh/uv/); `pyproject.toml` is the single source of truth for metadata and dependencies (`uv.lock` pins exact versions and is committed). There is no `requirements.txt` — add dependencies with `uv add <pkg>` (`uv add --dev <pkg>` for dev-only tools) and re-run `uv sync`. `setup.py` is a version-less no-op shim kept only so `python setup.py sdist`/`bdist_wheel` still work for `scripts/build_packages.sh`.
 
 ```bash
 # Install for development (creates .venv, installs deps + dev group from pyproject.toml)
@@ -46,15 +46,20 @@ make format    # uv run black breaknwipe tests && uv run isort breaknwipe tests
 uv run python tests/test_blockchain_functionality.py
 uv run python tests/test_qr_consistency.py
 
+# System-level (non-Python) dependencies only: hdparm, nvme-cli, smartmontools, uv itself
+sudo ./scripts/install_dependencies.sh
+
 # Package building / system install (see scripts/, all destructive — confirm with user)
-# These target end-user machines and intentionally use pip/requirements.txt, not uv.
-make install-system     # scripts/install.sh + scripts/install_requirements.sh
+# install.sh provisions a dedicated system user + systemd service and manages its
+# own copy of the source at /opt/breaknwipe/src with `uv sync` (it calls
+# install_dependencies.sh internally, so running it standalone first is optional).
+make install-system     # scripts/install.sh
 make uninstall-system    # scripts/uninstall.sh
-make package             # scripts/build_packages.sh (.deb/.rpm)
+make package             # scripts/build_packages.sh (.deb/.rpm, still setup.py/fpm-based)
 make demo                # scripts/demo.sh
 ```
 
-Root console entry points (from `setup.py`): `breaknwipe` and `bwipe`, both mapping to `breaknwipe.cli.main:main`.
+Root console entry points (from `pyproject.toml`'s `[project.scripts]`): `breaknwipe` and `bwipe`, both mapping to `breaknwipe.cli.main:main`.
 
 ## Architecture
 

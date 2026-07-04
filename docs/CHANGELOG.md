@@ -4,6 +4,21 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.5.0] - 2026-07-04
+
+### Added
+- `scripts/install_dependencies.sh` — installs OS-level packages (`hdparm`, `nvme-cli`, `smartmontools`, `rsync`, build headers, etc.) and `uv` itself; Python dependencies are then installed with `uv sync`
+
+### Changed
+- `scripts/install.sh` (the system-wide installer used by `make install-system`) now copies the project source into `/opt/breaknwipe/src` and provisions its Python environment with `uv sync` instead of a hand-rolled `python3.10`/pip virtualenv; it delegates OS package installation to `scripts/install_dependencies.sh`
+- Fixed a bug in the generated `breaknwipe` wrapper script where `$INSTALL_DIR` was never expanded (heredoc was fully quoted), so it resolved to a nonexistent `/venv/bin/python`; it now points at the correct `.venv` path
+- `scripts/uninstall.sh` no longer purges a pip cache (irrelevant now that the project doesn't use pip)
+- `Makefile`'s `install`, `install-system`, `run-interactive`, `run-list`, `run-help`, `test-device-detection`, and `security-check` targets now go through `uv sync` / `uv run`
+
+### Removed
+- `scripts/install_requirements.sh` and `requirements.txt` — superseded by `pyproject.toml` + `uv sync`
+- `scripts/breaknwipe_wrapper.sh` — a dead, unreferenced file hardcoding a path from a contributor's local machine
+
 ## [2.4.3] - 2026-07-04
 
 ### Added

@@ -3,6 +3,11 @@
 # BreakNWipe Installation Script
 # Installs BreakNWipe secure data wiping utility on Ubuntu/Debian systems
 #
+# Python dependencies are managed with uv (https://docs.astral.sh/uv/):
+# this script copies the project source into $INSTALL_DIR/src and runs
+# `uv sync` there to build an isolated .venv, instead of pip-installing
+# into a hand-rolled virtual environment.
+#
 
 set -e
 
@@ -22,7 +27,7 @@ USER="breaknwipe"
 GROUP="breaknwipe"
 
 # Version info
-BREAKNWIPE_VERSION="1.0.0"
+BREAKNWIPE_VERSION="2.5.0"
 
 # Functions
 print_status() {
@@ -67,39 +72,43 @@ check_system() {
     print_success "System compatibility check passed"
 }
 
-install_dependencies() {
-    print_status "Installing system dependencies..."
+run_dependency_installer() {
+    print_status "Installing system packages and uv..."
 
-    # Update package lists
-    if ! apt update; then
-        print_error "Failed to update package lists"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    if [[ ! -x "$script_dir/install_dependencies.sh" ]]; then
+        print_error "scripts/install_dependencies.sh not found next to install.sh"
         exit 1
     fi
 
-    # Define packages to install (Python will be installed separately)
-    local packages=(
-        "wget"
-        "curl"
-        "smartmontools"
-        "hdparm"
-        "nvme-cli"
-        "util-linux"
-        "parted"
-        "build-essential"
-        "libssl-dev"
-        "libffi-dev"
+    "$script_dir/install_dependencies.sh"
+}
+
+# Locates a usable `uv` binary. install_dependencies.sh installs uv for the
+# invoking (non-root) user via SUDO_USER, so root's PATH won't have it.
+resolve_uv_bin() {
+    if command -v uv &> /dev/null; then
+        command -v uv
+        return 0
+    fi
+
+    local candidates=(
+        "/root/.local/bin/uv"
+        "/home/${SUDO_USER:-}/.local/bin/uv"
+        "/usr/local/bin/uv"
     )
 
-    # Install packages one by one for better error handling
-    print_status "Installing required packages..."
-    for package in "${packages[@]}"; do
-        print_status "Installing $package..."
-        if ! apt install -y "$package"; then
-            print_warning "Failed to install $package, continuing..."
+    for candidate in "${candidates[@]}"; do
+        if [[ -x "$candidate" ]]; then
+            echo "$candidate"
+            return 0
         fi
     done
 
-    print_success "System dependencies installation completed"
+    print_error "Could not find 'uv'. Run scripts/install_dependencies.sh first."
+    exit 1
 }
 
 create_user_group() {
@@ -147,91 +156,62 @@ create_directories() {
     print_success "Directories created"
 }
 
-install_python310() {
-    print_status "Installing/checking Python 3.10..."
+install_source() {
+    print_status "Installing BreakNWipe source into $INSTALL_DIR/src..."
 
-    # Check if Python 3.10 is already installed
-    if command -v python3.10 &> /dev/null; then
-        print_success "Python 3.10 already installed"
-    else
-        print_status "Installing Python 3.10 and venv support..."
+    local repo_root
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-        # Add deadsnakes PPA for Python 3.10 on Ubuntu
-        if ! add-apt-repository -y ppa:deadsnakes/ppa; then
-            print_warning "Failed to add deadsnakes PPA, trying system Python..."
-        fi
+    mkdir -p "$INSTALL_DIR/src"
 
-        # Update package lists
-        apt update
+    rsync -a --delete \
+        --exclude='.git' \
+        --exclude='.venv' \
+        --exclude='venv' \
+        --exclude='__pycache__' \
+        --exclude='*.egg-info' \
+        --exclude='build' \
+        --exclude='dist' \
+        --exclude='node_modules' \
+        "$repo_root"/ "$INSTALL_DIR/src/"
 
-        # Install Python 3.10
-        if ! apt install -y python3.10 python3.10-venv python3.10-dev; then
-            print_error "Failed to install Python 3.10"
-            print_status "Trying to install system Python 3.10..."
-            if ! apt install -y python3.10; then
-                print_error "Failed to install Python 3.10. Please install it manually."
-                exit 1
-            fi
-        fi
-
-        print_success "Python 3.10 installed successfully"
-    fi
-
-    # Verify Python 3.10 installation
-    if ! python3.10 --version &>/dev/null; then
-        print_error "Python 3.10 installation verification failed"
-        exit 1
-    fi
-
-    print_success "Python 3.10 setup complete"
+    print_success "Source installed to $INSTALL_DIR/src"
 }
 
 setup_venv() {
-    print_status "Setting up virtual environment..."
+    print_status "Setting up Python environment with uv..."
 
-    local venv_dir="$INSTALL_DIR/venv"
+    local uv_bin
+    uv_bin="$(resolve_uv_bin)"
 
-    # Check if venv already exists
-    if [[ -d "$venv_dir" ]]; then
-        print_success "Virtual environment already exists at $venv_dir"
-    else
-        print_status "Creating virtual environment with Python 3.10..."
-
-        # Create venv
-        if ! python3.10 -m venv "$venv_dir"; then
-            print_error "Failed to create virtual environment"
-            exit 1
-        fi
-
-        print_success "Virtual environment created successfully"
+    if ! (cd "$INSTALL_DIR/src" && "$uv_bin" sync --no-dev); then
+        print_error "uv sync failed"
+        exit 1
     fi
 
-    # Set ownership
-    chown -R "$USER:$GROUP" "$venv_dir"
+    chown -R "$USER:$GROUP" "$INSTALL_DIR/src"
 
-    print_success "Virtual environment setup complete"
+    print_success "Python environment ready at $INSTALL_DIR/src/.venv"
 }
 
 create_wrapper_script() {
     print_status "Creating wrapper script..."
 
-    cat > "$BINARY_DIR/breaknwipe" << 'EOF'
+    local venv_python="$INSTALL_DIR/src/.venv/bin/python"
+
+    cat > "$BINARY_DIR/breaknwipe" << EOF
 #!/bin/bash
 #
-# BreakNWipe Wrapper Script
+# BreakNWipe Wrapper Script (auto-generated by scripts/install.sh)
 #
 
-VENV_DIR="$INSTALL_DIR/venv"
-
-# Check if running as root
-if [[ $EUID -ne 0 ]]; then
+if [[ \$EUID -ne 0 ]]; then
     echo "Error: BreakNWipe requires root privileges"
     echo "Please run with sudo: sudo breaknwipe [options]"
     exit 1
 fi
 
-# Activate virtual environment and run BreakNWipe
-exec "$VENV_DIR/bin/python" -m breaknwipe.cli.main "$@"
+exec "$venv_python" -m breaknwipe.cli.main "\$@"
 EOF
 
     chmod +x "$BINARY_DIR/breaknwipe"
@@ -338,9 +318,9 @@ After=network.target
 Type=simple
 User=$USER
 Group=$GROUP
-WorkingDirectory=$INSTALL_DIR
+WorkingDirectory=$INSTALL_DIR/src
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$INSTALL_DIR/venv/bin/python -m breaknwipe.daemon
+ExecStart=$INSTALL_DIR/src/.venv/bin/python -m breaknwipe.daemon
 Restart=always
 RestartSec=10
 
@@ -461,22 +441,21 @@ run_post_install_checks() {
     fi
 
     # Check virtual environment
-    if [[ -d "$INSTALL_DIR/venv" ]]; then
-        print_success "Virtual environment exists at $INSTALL_DIR/venv"
-        print_status "Run './scripts/install_requirements.sh' to install Python packages"
+    if [[ -d "$INSTALL_DIR/src/.venv" ]]; then
+        print_success "Python environment exists at $INSTALL_DIR/src/.venv"
     else
-        print_warning "Virtual environment not found"
+        print_warning "Python environment not found at $INSTALL_DIR/src/.venv"
     fi
 
-    # Check Python 3.10 availability
-    if command -v python3.10 &> /dev/null; then
-        print_success "Python 3.10 is available"
+    # Check the package imports correctly
+    if "$INSTALL_DIR/src/.venv/bin/python" -c "import breaknwipe" &>/dev/null; then
+        print_success "breaknwipe package imports correctly"
     else
-        print_warning "Python 3.10 not found"
+        print_warning "breaknwipe package failed to import from $INSTALL_DIR/src/.venv"
     fi
 
     # Check directories exist
-    for dir in "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "/var/lib/breaknwipe" "$INSTALL_DIR/venv"; do
+    for dir in "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR" "/var/lib/breaknwipe" "$INSTALL_DIR/src/.venv"; do
         if [[ -d "$dir" ]]; then
             print_success "Directory exists: $dir"
         else
@@ -499,19 +478,14 @@ show_completion_message() {
     echo -e "${GREEN}================================================${NC}"
     echo
     echo -e "${BLUE}Installation Summary:${NC}"
-    echo "  • Installation directory: $INSTALL_DIR"
-    echo "  • Virtual environment: $INSTALL_DIR/venv (Python 3.10)"
+    echo "  • Source + Python environment: $INSTALL_DIR/src (managed by uv)"
     echo "  • Configuration files: $CONFIG_DIR"
     echo "  • Log files: $LOG_DIR"
     echo "  • Reports directory: /var/lib/breaknwipe/reports"
     echo
-    echo -e "${BLUE}Next Steps:${NC}"
-    echo "  1. Install Python packages: ${GREEN}./scripts/install_requirements.sh${NC}"
-    echo "  2. Test installation: ${GREEN}sudo breaknwipe --help${NC}"
-    echo "  3. Run demo: ${GREEN}sudo make demo${NC}"
-    echo
-    echo -e "${BLUE}Usage (after installing requirements):${NC}"
+    echo -e "${BLUE}Usage:${NC}"
     echo "  • Interactive mode: ${GREEN}sudo breaknwipe --interactive${NC}"
+    echo "  • Web GUI: ${GREEN}sudo breaknwipe --gui${NC}"
     echo "  • List devices: ${GREEN}sudo breaknwipe --list-devices${NC}"
     echo "  • Wipe device: ${GREEN}sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear${NC}"
     echo "  • Get help: ${GREEN}breaknwipe --help${NC}"
@@ -521,11 +495,8 @@ show_completion_message() {
     echo "  • Service status: ${GREEN}sudo systemctl status breaknwipe-daemon${NC}"
     echo "  • View logs: ${GREEN}sudo journalctl -u breaknwipe-daemon${NC}"
     echo
-    echo -e "${YELLOW}Important Notes:${NC}"
-    echo "  • System setup complete, but Python packages need separate installation"
-    echo "  • Run ${GREEN}./scripts/install_requirements.sh${NC} as regular user (no sudo)"
-    echo "  • BreakNWipe requires root privileges to access storage devices"
-    echo "  • Configuration files are located in $CONFIG_DIR"
+    echo -e "${YELLOW}Note:${NC} to update after pulling new code, re-run this script -- it"
+    echo "re-syncs the source and Python environment via uv each time."
     echo
     echo -e "${GREEN}Installation completed successfully!${NC}"
     echo
@@ -540,10 +511,10 @@ main() {
 
     check_root
     check_system
-    install_dependencies
-    install_python310
+    run_dependency_installer
     create_user_group
     create_directories
+    install_source
     setup_venv
     create_wrapper_script
     create_config_files

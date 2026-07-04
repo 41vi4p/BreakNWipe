@@ -17,8 +17,7 @@ help:
 	@echo "  demo             - Run demonstration"
 
 install:
-	pip install -r requirements.txt
-	pip install .
+	uv sync --no-dev
 
 dev-install:
 	uv sync
@@ -52,11 +51,8 @@ package: build
 
 install-system:
 	@echo "Installing BreakNWipe system-wide..."
-	chmod +x scripts/install.sh scripts/install_requirements.sh
+	chmod +x scripts/install.sh scripts/install_dependencies.sh
 	sudo ./scripts/install.sh
-	@echo ""
-	@echo "System installation complete. Now installing Python packages..."
-	./scripts/install_requirements.sh
 
 uninstall-system:
 	@echo "Removing BreakNWipe from system..."
@@ -65,13 +61,13 @@ uninstall-system:
 
 # Development shortcuts
 run-interactive:
-	sudo python -m breaknwipe.cli.main --interactive
+	sudo uv run python -m breaknwipe.cli.main --interactive
 
 run-list:
-	sudo python -m breaknwipe.cli.main --list-devices
+	sudo uv run python -m breaknwipe.cli.main --list-devices
 
 run-help:
-	python -m breaknwipe.cli.main --help
+	uv run python -m breaknwipe.cli.main --help
 
 demo:
 	@echo "Running BreakNWipe demonstration..."
@@ -90,7 +86,7 @@ test-algorithms:
 	uv run python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
 
 test-device-detection:
-	sudo python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
+	sudo uv run python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
 
 # Documentation
 docs:
@@ -103,5 +99,5 @@ docs:
 # Security check
 security-check:
 	@echo "Running security checks..."
-	python -c "import os; print('Root check:', os.geteuid() == 0)"
-	python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"
+	uv run python -c "import os; print('Root check:', os.geteuid() == 0)"
+	uv run python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"
