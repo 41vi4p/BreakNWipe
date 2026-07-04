@@ -4,6 +4,11 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.6.1] - 2026-07-05
+
+### Fixed
+- **The `2.6.0` `.deb` was broken on install** — confirmed by real-world testing (thank you for catching this): `breaknwipe`/`sudo breaknwipe --interactive` failed with `Permission denied` / `No such file or directory` against `/opt/breaknwipe/src/.venv/bin/python`, and after a first fix attempt, `ModuleNotFoundError: No module named 'breaknwipe'`. Root cause: `uv sync` bakes *absolute* paths into the venv at sync time — the managed-Python interpreter symlink, and the project's own editable-install reference — and `scripts/build_packages.sh` was staging the build under `build/pkgroot/opt/breaknwipe/src`, a path that doesn't exist once installed at the real `/opt/breaknwipe/src`. `scripts/build_packages.sh` now builds directly at the real final absolute paths (`/opt/breaknwipe`, `/usr/bin`) inside the disposable build container instead of a separate staging tree, and forces `uv` to use its own managed Python (`--managed-python`) installed at that same fixed path (`UV_PYTHON_INSTALL_DIR=/opt/breaknwipe/python`), vendored into the package alongside `.venv`. Verified this time with a true cross-machine test: built in one throwaway container, then installed and run in a completely separate, unrelated one — `breaknwipe --help`/`--version`/`--list-devices` all work and the interpreter symlink resolves correctly.
+
 ## [2.6.0] - 2026-07-04
 
 ### Added

@@ -125,8 +125,8 @@ rm ~/breaknwipe-gpg-setup/private.key
 Push a version tag — this is what `.github/workflows/apt-repo.yml` listens for:
 
 ```bash
-git tag v2.6.0   # match whatever version is currently in breaknwipe/__init__.py
-git push origin v2.6.0
+git tag v2.6.1   # match whatever version is currently in breaknwipe/__init__.py
+git push origin v2.6.1
 ```
 
 (You can also trigger it manually without tagging anything yet, to test: go to the repo's

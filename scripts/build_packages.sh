@@ -38,7 +38,6 @@ URL="https://github.com/41vi4p/BreakNWipe"
 BUILD_DIR="$(pwd)/build"
 DIST_DIR="$(pwd)/dist"
 PACKAGE_DIR="$BUILD_DIR/packages"
-PKGROOT_DIR="$BUILD_DIR/pkgroot"
 
 # Functions
 print_status() {
@@ -112,23 +111,44 @@ prepare_build_environment() {
     # Clean previous builds
     rm -rf "$BUILD_DIR" "$DIST_DIR"
     mkdir -p "$BUILD_DIR" "$DIST_DIR" "$PACKAGE_DIR"
-    mkdir -p "$PKGROOT_DIR/opt/breaknwipe/src" "$PKGROOT_DIR/usr/bin"
+
+    # Unlike a typical fpm dir-input build, this stages content directly at its
+    # real final installation path (/opt/breaknwipe, /usr/bin) rather than a
+    # separate pkgroot/ tree, then has fpm package it with `-C /`. This is
+    # deliberate: `uv sync` bakes some *absolute* paths in at sync time --
+    # the managed-Python interpreter symlink, and the project's own editable
+    # install location -- and those only resolve correctly after `apt install`
+    # if the path used at build time is identical to the path used at install
+    # time. Verified the hard way: staging under a separate build/pkgroot/...
+    # directory produced a package that failed on a different machine with
+    # "No such file or directory" (broken interpreter symlink) and then
+    # "ModuleNotFoundError: No module named 'breaknwipe'" (stale editable-install
+    # reference) once that first bug was fixed. Building at the real path
+    # avoids both, since this always runs inside a disposable/ephemeral build
+    # container where writing to /opt and /usr directly is safe.
+    rm -rf /opt/breaknwipe
+    mkdir -p /opt/breaknwipe/src
 
     print_status "Staging source + uv-managed virtual environment..."
     rsync -a \
         --exclude='.git' --exclude='.venv' --exclude='venv' \
         --exclude='__pycache__' --exclude='*.egg-info' \
         --exclude='build' --exclude='dist' --exclude='node_modules' \
-        ./ "$PKGROOT_DIR/opt/breaknwipe/src/"
+        ./ /opt/breaknwipe/src/
 
-    (cd "$PKGROOT_DIR/opt/breaknwipe/src" && uv sync --no-dev)
+    # Force uv to download and use its own managed Python (--managed-python,
+    # ignoring any build-machine system Python) so behavior is deterministic
+    # regardless of what's installed on the build host, and point its install
+    # dir at the same fixed path this package always installs to.
+    export UV_PYTHON_INSTALL_DIR="/opt/breaknwipe/python"
+    (cd /opt/breaknwipe/src && uv sync --no-dev --managed-python)
 
-    cat > "$PKGROOT_DIR/usr/bin/breaknwipe" << 'EOF'
+    cat > /usr/bin/breaknwipe << 'EOF'
 #!/bin/bash
 exec /opt/breaknwipe/src/.venv/bin/python -m breaknwipe.cli.main "$@"
 EOF
-    chmod +x "$PKGROOT_DIR/usr/bin/breaknwipe"
-    ln -sf breaknwipe "$PKGROOT_DIR/usr/bin/bwipe"
+    chmod +x /usr/bin/breaknwipe
+    ln -sf breaknwipe /usr/bin/bwipe
 
     print_success "Build environment prepared"
 }
@@ -139,11 +159,13 @@ build_deb_package() {
     local deb_dir="$PACKAGE_DIR/deb"
     mkdir -p "$deb_dir"
 
-    # Package the pre-built pkgroot/ (source + uv venv + wrapper) as a plain
-    # directory tree. No python3 dependency is declared: the venv is fully
-    # self-contained (uv provisions its own Python), and its compiled
-    # extensions (numpy, cryptography, pydantic-core, ...) are architecture-
-    # specific, hence --architecture amd64 rather than the old "all".
+    # Package the pre-built /opt/breaknwipe + /usr/bin (source + uv venv +
+    # managed Python + wrapper) as a plain directory tree, built directly at
+    # those real absolute paths -- see prepare_build_environment() for why.
+    # No python3 dependency is declared: the venv is fully self-contained
+    # (uv's own managed Python is vendored in), and its compiled extensions
+    # (numpy, cryptography, pydantic-core, ...) are architecture-specific,
+    # hence --architecture amd64 rather than the old "all".
     fpm \
         --input-type dir \
         --output-type deb \
@@ -167,7 +189,7 @@ build_deb_package() {
         --after-remove scripts/postrm \
         --deb-suggests "parted" \
         --deb-suggests "lsblk" \
-        -C "$PKGROOT_DIR" opt usr
+        -C / opt/breaknwipe usr/bin/breaknwipe usr/bin/bwipe
 
     print_success "Debian package built: $deb_dir/${PACKAGE_NAME}_${PACKAGE_VERSION}-${PACKAGE_RELEASE}_amd64.deb"
 }
@@ -183,7 +205,8 @@ build_rpm_package() {
     local rpm_dir="$PACKAGE_DIR/rpm"
     mkdir -p "$rpm_dir"
 
-    # Same self-contained pkgroot/ as build_deb_package -- see its comment above.
+    # Same self-contained /opt/breaknwipe + /usr/bin as build_deb_package --
+    # see its comment above.
     fpm \
         --input-type dir \
         --output-type rpm \
@@ -205,7 +228,7 @@ build_rpm_package() {
         --after-install scripts/postinst \
         --before-remove scripts/prerm \
         --after-remove scripts/postrm \
-        -C "$PKGROOT_DIR" opt usr
+        -C / opt/breaknwipe usr/bin/breaknwipe usr/bin/bwipe
 
     print_success "RPM package built: $rpm_dir/${PACKAGE_NAME}-${PACKAGE_VERSION}-${PACKAGE_RELEASE}.x86_64.rpm"
 }
