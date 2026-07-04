@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.5.2-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.4-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -16,6 +16,10 @@
 [![SIH 2025](https://img.shields.io/badge/Smart%20India%20Hackathon-2025-FF6B35.svg)](#-about-the-project)
 
 </div>
+
+---
+
+**Quick Links:** [Features](#-features) • [How It Works](#-how-it-works) • [Quick Start](#-quick-start) • [Blockchain Verification](#-blockchain-verification) • [Standards Compliance](#-standards-compliance) • [Important Warnings](#-important-warnings) • [Development](#-development) • [License](#-license)
 
 ---
 
@@ -109,7 +113,7 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 
 > **OS support:** the installer scripts (`quickstart.sh`, `install_dependencies.sh`, `install.sh`, and `make install-system`) target **Ubuntu/Debian on x86_64** — they shell out to `apt` for system packages (`hdparm`, `nvme-cli`, `smartmontools`, etc.) and check for `apt` up front, so they will refuse to run on Fedora/RHEL, Arch, macOS, or non-x86_64 hosts. `uv sync` / `pip install -e .` on their own are platform-agnostic (any Linux/macOS with Python), but you'll still need to provide `hdparm`/`nvme-cli`/`smartmontools` yourself via your distro's package manager for device-level operations to work.
 
-**One-liner** (clones the repo and runs the full system installer — dedicated user, systemd service, `breaknwipe`/`bwipe` commands on PATH). As with any curl-to-bash installer, review the script before piping it into a root shell:
+**One-liner (Ubuntu/Debian, x86_64 only)** — clones the repo and runs the full system installer (dedicated user, systemd service, `breaknwipe`/`bwipe` commands on PATH). As with any curl-to-bash installer, review the script before piping it into a root shell:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/quickstart.sh | sudo bash
@@ -135,6 +139,25 @@ pip install -e ".[web,blockchain]"   # with optional extras
 # Or full system-wide install (system deps + dedicated user + systemd service)
 sudo make install-system
 ```
+
+### Uninstallation
+
+**If you still have the repo cloned:**
+
+```bash
+sudo make uninstall-system
+# or directly:
+sudo ./scripts/uninstall.sh
+```
+
+**If you installed via the one-liner and don't have a local checkout anymore** — `uninstall.sh` is self-contained (it only touches system paths like `/opt/breaknwipe`, `/etc/breaknwipe`, `/usr/local/bin/breaknwipe`, so it doesn't need the repo present). Download it and run it directly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/uninstall.sh -o breaknwipe-uninstall.sh
+sudo bash breaknwipe-uninstall.sh
+```
+
+Note: unlike `quickstart.sh`, don't pipe this straight into `sudo bash` (`curl ... | sudo bash`) — it asks interactive yes/no confirmations before removing data and system dependencies, and those prompts don't work when the script's own text is occupying stdin. Download it to a file first, as above.
 
 ### Basic Usage
 

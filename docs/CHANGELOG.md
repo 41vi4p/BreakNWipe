@@ -4,6 +4,16 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.5.4] - 2026-07-04
+
+### Added
+- `README.md` "Quick Links" nav bar above "About the Project", linking to the sections readers reach for most often (Features, How It Works, Quick Start, Blockchain Verification, Standards Compliance, Important Warnings, Development, License)
+
+## [2.5.3] - 2026-07-04
+
+### Added
+- `README.md` "Uninstallation" section: `sudo make uninstall-system` for local checkouts, plus a download-and-run one-liner (`curl -fsSL .../scripts/uninstall.sh -o ... && sudo bash ...`) for hosts installed via `quickstart.sh` that no longer have a local clone — `uninstall.sh` only touches system paths, so it doesn't need the repo present. Documented as download-then-run rather than piped, since it prompts for interactive confirmation before removing data/dependencies.
+
 ## [2.5.2] - 2026-07-04
 
 ### Changed
