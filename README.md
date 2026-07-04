@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.5.4-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.5-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -20,6 +20,20 @@
 ---
 
 **Quick Links:** [Features](#-features) • [How It Works](#-how-it-works) • [Quick Start](#-quick-start) • [Blockchain Verification](#-blockchain-verification) • [Standards Compliance](#-standards-compliance) • [Important Warnings](#-important-warnings) • [Development](#-development) • [License](#-license)
+
+---
+
+**Install** (Ubuntu/Debian, x86_64 — [details](#installation)):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/quickstart.sh | sudo bash
+```
+
+**Uninstall** ([details](#uninstallation)):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/uninstall.sh -o breaknwipe-uninstall.sh && sudo bash breaknwipe-uninstall.sh
+```
 
 ---
 

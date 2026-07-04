@@ -4,6 +4,11 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.5.5] - 2026-07-04
+
+### Added
+- Install/uninstall one-liners surfaced at the very top of `README.md` (right under the badges, before "About the Project"), linking down to the full `#installation`/`#uninstallation` sections for anyone who wants the commands without reading through the rest of the doc
+
 ## [2.5.4] - 2026-07-04
 
 ### Added
