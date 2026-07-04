@@ -1,59 +1,125 @@
-# BreakNWipe - Comprehensive Data Wiping CLI Utility
+<div align="center">
 
-A robust, secure, and standards-compliant data wiping solution designed to address India's e-waste crisis by providing trustworthy IT asset recycling through secure data sanitization.
+<img src="frontend_ui/images/logo.png" alt="BreakNWipe Logo" width="120"/>
 
-## 🎯 Problem Statement
+# BreakNWipe
 
-India generates over 1.75 million tonnes of e-waste annually. A key barrier to responsible recycling is fear of data breaches, leading to over ₹50,000 crore worth of IT assets being hoarded instead of properly recycled. BreakNWipe solves this by providing:
+**A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-- **Secure data erasure** including hidden areas (HPA/DCO, SSD sectors)
-- **Tamper-proof certificates** (PDF and JSON formats)
-- **One-click interface** suitable for general public use
-- **Offline capability** (bootable ISO/USB support)
-- **Third-party verification** of wipe status
-- **Standards compliance** (NIST SP 800-88, IEEE 2883:2022)
+[![Version](https://img.shields.io/badge/version-2.4.1-blue.svg)](https://github.com/41vi4p/BreakNWipe)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Web%20GUI-009688.svg?logo=fastapi&logoColor=white)](#%EF%B8%8F-user-interfaces)
+[![Solidity](https://img.shields.io/badge/Solidity-Sepolia%20Testnet-363636.svg?logo=solidity&logoColor=white)](#-blockchain-verification)
+[![NIST SP 800-88](https://img.shields.io/badge/NIST-SP%20800--88-orange.svg)](#-standards-compliance)
+[![SIH 2025](https://img.shields.io/badge/Smart%20India%20Hackathon-2025-FF6B35.svg)](#-about-the-project)
+
+</div>
+
+---
+
+## 🏆 About the Project
+
+BreakNWipe was built for **Smart India Hackathon 2025** by **Team CodeBreakers!**
+
+| | |
+|---|---|
+| **Problem Statement ID** | SIH25070 |
+| **Problem Statement** | Secure Data Wiping for Trustworthy IT Asset Recycling |
+| **Theme** | Miscellaneous |
+| **Category** | Software |
+| **Team ID** | 65891 |
+| **Team Name** | CodeBreakers! |
+
+### The Problem
+
+India generates over **1.75 million tonnes of e-waste annually**. A key barrier to responsible recycling is the fear of data breaches, which leads to over **₹50,000 crore worth of IT assets** being hoarded instead of properly recycled. BreakNWipe builds trust in the recycling ecosystem by making data sanitization verifiable, standards-compliant, and simple enough for the general public.
+
+### Why We're Different
+
+BreakNWipe doesn't just overwrite data — it uses a three-layer defense:
+
+1. **🔐 Randomized Encryption Algorithm (REA)** — data is first encrypted on-the-fly with randomized keys and multi-chain encryption, making it *unreadable*
+2. **🔑 Secure Key Destruction** — encryption keys are destroyed, making the data *undecryptable*
+3. **📝 Overwriting** — one of seven industry-standard overwrite algorithms makes the data *unrecoverable*
+
+And the result isn't just a wiped drive — it's **proof anyone can independently verify**: a digitally signed PDF/JSON certificate with a QR code, anchored on a public blockchain.
+
+## ⚙️ How It Works
+
+```
+   PRE-WIPE                      WIPING                        POST-WIPE
+┌─────────────────┐   ┌───────────────────────────┐   ┌────────────────────────┐
+│ Launch software │   │ Quick Wipe: 1-pass        │   │ PDF / JSON report      │
+│ Detect drives & │ → │  one-click for the public │ → │ Blockchain + QR proof  │
+│ hidden areas    │   │ Deep Wipe: REA encryption │   │ Third-party verifiable │
+│ (HPA/DCO/bad    │   │  + multipass overwrite    │   │ Device safe to discard │
+│  blocks)        │   │  (7 algorithms)           │   │ Data 100% irrecoverable│
+└─────────────────┘   └───────────────────────────┘   └────────────────────────┘
+```
 
 ## ✨ Features
 
-### 🔒 Security Standards
-- **NIST SP 800-88 Rev 1** (Clear/Purge methods)
-- **IEEE 2883:2022** (Latest sanitization standard)
-- **DoD 5220.22-M** (3-pass and 7-pass variants)
-- **Gutmann Method** (35-pass for legacy drives)
-- **Hardware-level erasure** (ATA Secure Erase, NVMe Sanitize)
+### ✅ Implemented
 
-### 💾 Device Support
-- Traditional HDDs (magnetic storage)
-- SATA SSDs with ATA Secure Erase
-- NVMe drives with sanitize commands
-- USB flash drives and memory cards
-- Special area handling (HPA/DCO, bad sectors)
+#### Wiping Engine
+- [x] **7 overwrite algorithms** — NIST Clear, NIST Purge, DoD 3-Pass, DoD 7-Pass, Gutmann 35-Pass, Random, Zero-fill (+ fully custom)
+- [x] **REA Cryptographic Erase** — `rea-basic`, `rea-multichain`, `rea-extreme`, `rea-fast`, `rea-custom` (randomized encryption + key destruction + overwrite)
+- [x] **Hardware-level erasure** — ATA Secure Erase and NVMe Sanitize/Format commands
+- [x] **Read-back verification** of wiped data with per-block validation
+- [x] **Dry-run mode** for safe testing
 
-### 📋 Certification & Verification
-- Digitally signed PDF certificates
-- JSON reports for automated processing
-- QR codes for instant verification
-- Tamper-proof audit trails
-- Third-party verification support
+#### Device Support
+- [x] HDDs, SATA SSDs, NVMe drives, USB flash drives and memory cards
+- [x] **Hidden area detection** — HPA (Host Protected Area) and DCO (Device Configuration Overlay) via `hdparm`
+- [x] Android device wiping via **ADB** (encrypts before factory reset — stronger than a plain factory reset)
+- [x] Drive temperature monitoring during long wipes
 
-### 🖥️ User Interface
-- **Interactive Mode**: Guided wizard for beginners
-- **Expert Mode**: Full command-line control
-- **Batch Processing**: Multiple device automation
-- **Real-time Progress**: Speed, ETA, and status updates
+#### Certification & Verification
+- [x] **Digitally signed PDF certificates** (RSA / X.509)
+- [x] **JSON reports** for automated processing
+- [x] **QR codes** for instant verification
+- [x] **Blockchain anchoring** — certificates stored on Ethereum Sepolia via the `ReportRegistryWithJson` smart contract
+- [x] **Online QR verification** through the [datawipe webapp](https://datawipe.vercel.app) (scan → cross-check on blockchain → tamper-proof report)
+- [x] Audit-trail logging to a local database
+
+#### User Interfaces
+- [x] **Interactive CLI wizard** for beginners (`--interactive`)
+- [x] **Expert CLI mode** with full command-line control
+- [x] **Web GUI** — FastAPI + WebSocket interface with real-time progress, speed, and ETA (`--gui`)
+- [x] **Batch processing** of multiple devices from a config file
+- [x] `.deb` / `.rpm` package build scripts and system installer
+
+### 🚧 Planned / Not Yet Implemented
+
+- [ ] **EDL mode wiping** for Qualcomm chipsets (requires QFIL integration)
+- [ ] **SP Flash Tool mode** for MediaTek chipsets
+- [ ] **Odin download mode** for Samsung chipsets
+- [ ] **Bootable ISO/USB** — standalone offline wiping environment (custom OS)
+- [ ] **Windows support** (currently Linux-only)
+- [ ] **Multilingual UI** with localized labels
+- [ ] **PyPI release** (`pip install breaknwipe`)
+- [ ] Resume capability for interrupted wipes
+- [ ] Automated test suite with CI
 
 ## 🚀 Quick Start
 
 ### Installation
 
 ```bash
-# Install from PyPI (when available)
-pip install breaknwipe
+# Clone the repository
+git clone https://github.com/41vi4p/BreakNWipe.git
+cd BreakNWipe
 
-# Or install from source
-git clone https://github.com/breaknwipe/breaknwipe.git
-cd breaknwipe
+# Install from source
 pip install -e .
+
+# Or with optional extras
+pip install -e ".[web,blockchain]"
+
+# Or full system install (installs dependencies like hdparm, nvme-cli)
+make install-system
 ```
 
 ### Basic Usage
@@ -62,178 +128,158 @@ pip install -e .
 # Interactive mode (recommended for beginners)
 sudo breaknwipe --interactive
 
+# Launch the web GUI at http://127.0.0.1:8000
+sudo breaknwipe --gui
+
 # List available devices
 sudo breaknwipe --list-devices
 
-# Quick wipe with NIST Clear standard
-sudo breaknwipe wipe --device /dev/sda --algorithm nist-clear --certificate
+# Wipe with NIST Clear and generate a certificate
+sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear --certificate
 
-# Expert mode with verification
-sudo breaknwipe wipe --device /dev/sda --algorithm dod-3pass --verify --output ./reports/
+# Safety first: inspect the device and dry-run before wiping
+sudo breaknwipe info /dev/sdX
+sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear --dry-run
 ```
 
-### Safety First 🛡️
-
-```bash
-# Always check device information first
-sudo breaknwipe info /dev/sda
-
-# Use dry-run to test without actually wiping
-sudo breaknwipe wipe --device /dev/sda --algorithm nist-clear --dry-run
-```
-
-## 📖 Documentation
-
-### Available Commands
+### Commands
 
 | Command | Description |
 |---------|-------------|
 | `wipe` | Perform secure data wiping |
-| `info` | Display device information |
+| `info <device>` | Display detailed device information |
 | `list-algorithms` | Show available wiping algorithms |
-| `batch` | Batch processing from config file |
+| `batch` | Batch processing from a JSON/YAML config file |
 | `verify-certificate` | Verify wipe certificate authenticity |
 
 ### Wiping Algorithms
 
 | Algorithm | Passes | Description | Use Case |
 |-----------|--------|-------------|----------|
-| `nist-clear` | 1 | NIST SP 800-88 Clear method | General purpose |
-| `nist-purge` | 3 | NIST SP 800-88 Purge method | High security |
-| `dod-3pass` | 3 | DoD 5220.22-M standard | Government compliance |
-| `dod-7pass` | 7 | Enhanced DoD standard | Maximum security |
-| `gutmann` | 35 | Gutmann research method | Legacy drives |
-| `random` | Variable | Random data overwrite | Configurable security |
-| `zeros` | 1 | Zero-fill method | Quick sanitization |
+| `nist-clear` | 1 | NIST SP 800-88 Clear | General purpose |
+| `nist-purge` | 3 | NIST SP 800-88 Purge | High security |
+| `dod-3pass` | 3 | DoD 5220.22-M | Government compliance |
+| `dod-7pass` | 7 | Enhanced DoD | Maximum security |
+| `gutmann` | 35 | Gutmann method | Legacy magnetic drives |
+| `random` | Custom | Random data overwrite | Configurable security |
+| `zeros` | 1 | Zero-fill | Quick sanitization |
+| `custom` | Custom | User-defined patterns | Advanced users |
+| `rea-*` | 1–7+ | Randomized Encryption Algorithm + overwrite | Deep Wipe (via Web GUI) |
 
-### Certificate Features
+## 🔗 Blockchain Verification
 
-- **Device identification**: Serial number, model, capacity
-- **Wipe details**: Algorithm used, timestamps, parameters
-- **Verification**: Cryptographic hash verification
-- **Digital signature**: Tamper-proof authenticity
-- **QR code**: Quick verification and audit trail
-- **Standards compliance**: NIST/DoD/IEEE certification
+Every wipe certificate can be anchored on the **Ethereum Sepolia testnet**:
 
-## 🔧 Advanced Usage
+1. BreakNWipe completes the wipe and generates the signed certificate
+2. The certificate hash (or full JSON) is stored on-chain via the `ReportRegistryWithJson` contract
+3. A QR code embedding the blockchain reference is added to the PDF report
+4. Anyone can scan the QR at **[datawipe.vercel.app](https://datawipe.vercel.app)** — the app queries the smart contract and displays the tamper-proof verification result
 
-### Batch Processing
-
-Create a configuration file:
-
-```json
-{
-  "devices": [
-    {
-      "path": "/dev/sda",
-      "algorithm": "nist-purge",
-      "verify": true
-    },
-    {
-      "path": "/dev/sdb",
-      "algorithm": "dod-3pass",
-      "verify": true
-    }
-  ],
-  "output_dir": "./batch_reports/",
-  "parallel": 2
-}
-```
-
-Run batch processing:
+Setup details: [docs/BLOCKCHAIN_INTEGRATION.md](docs/BLOCKCHAIN_INTEGRATION.md)
 
 ```bash
-sudo breaknwipe batch --config batch_config.json
+# Configure your credentials (never commit the real .env!)
+cp breaknwipe/.env.example breaknwipe/.env
+cp blockchain/.env.example blockchain/.env
 ```
 
-### Custom Algorithms
-
-```bash
-# Custom random passes
-sudo breaknwipe wipe --device /dev/sda --algorithm random --passes 5
-
-# Custom pattern (advanced users)
-sudo breaknwipe wipe --device /dev/sda --algorithm custom --passes 3
-```
-
-## ⚠️ Important Warnings
-
-- **⚠️ DATA DESTRUCTION**: All data will be permanently destroyed
-- **🔒 ROOT REQUIRED**: Must run with sudo/root privileges
-- **💾 UNMOUNT FIRST**: Unmount filesystems before wiping
-- **🔌 POWER STABLE**: Ensure stable power during operation
-- **🌡️ TEMPERATURE**: Monitor drive temperature during long wipes
-- **💿 RAID ARRAYS**: Handle RAID configurations with extreme care
-
-## 🏗️ Architecture
+## 🏗️ Repository Structure
 
 ```
-breaknwipe/
-├── wipe_engine/     # Core wiping algorithms and engine
-├── device/          # Device detection and hardware handling
-├── certificate/     # Certificate generation and verification
-├── cli/            # Command-line interface
-└── tests/          # Test suites and validation
+BreakNWipe/
+├── breaknwipe/           # Python package
+│   ├── wipe_engine/      #   Core wiping algorithms, REA, verification
+│   ├── device/           #   Device detection, ATA/NVMe/mobile handlers
+│   ├── certificate/      #   PDF/JSON certs, signatures, QR, blockchain
+│   ├── cli/              #   Interactive & expert CLI, progress display
+│   ├── web/              #   FastAPI server, WebSocket, session manager
+│   └── logging/          #   Audit-trail logging service & database
+├── blockchain/           # Hardhat project — ReportRegistryWithJson contract
+├── frontend_ui/          # Web GUI static files (HTML/CSS)
+├── docs/                 # Design docs, integration guides, SIH presentation
+├── scripts/              # Install, packaging, demo & setup scripts
+├── tests/                # Integration test scripts
+├── Makefile              # Development commands (make help)
+└── setup.py              # Package configuration
 ```
-
-## 📊 Performance
-
-| Drive Type | Algorithm | Speed (Typical) | Time (1TB) |
-|------------|-----------|-----------------|------------|
-| HDD 7200 RPM | NIST Clear | 150 MB/s | ~2 hours |
-| SSD SATA | ATA Secure Erase | 500 MB/s | ~30 minutes |
-| NVMe SSD | NVMe Sanitize | 2000 MB/s | ~8 minutes |
-| USB 3.0 | Random 3-pass | 50 MB/s | ~17 hours |
-
-## 👥 Team Credits
-
-**BreakNWipe** by **CodeBreakers**:
-
-- **Blaise Rodrigues (Team Lead)** - Algorithms, Testing & Architecture Design
-- **David Porathur** - CLI Utility, Features Integration & Architecture Design
-- **Vanessa Rodrigues** - Nextjs App, Research & Architecture Design
-- **Natasha Lewis** - UI & Research
-- **Chris Lopes** - Nextjs App with digital signature verification
-- **Anastasia Lopes** - UI, frontend & Research
-
-
-### Development Setup
-
-```bash
-git clone https://github.com/breaknwipe/breaknwipe.git
-cd breaknwipe
-pip install -e ".[dev]"
-pytest tests/
-```
-
 
 ## 🏛️ Standards Compliance
 
-- **NIST SP 800-88 Rev 1**: U.S. Federal media sanitization guidelines
-- **IEEE 2883:2022**: Standard for sanitization of storage
-- **Common Criteria**: Protection profiles for secure deletion
-- **ISO/IEC 27040**: Storage security guidelines
-- **BSI TL-03423**: German federal security standards
+- **NIST SP 800-88 Rev 1** — U.S. Federal media sanitization guidelines (Clear/Purge)
+- **IEEE 2883:2022** — Standard for sanitization of storage
+- **DoD 5220.22-M** — 3-pass and 7-pass overwrite variants
+- **ISO/IEC 27040** — Storage security guidelines
+
+## ⚠️ Important Warnings
+
+- **💀 DATA DESTRUCTION** — all data on the target device is permanently destroyed
+- **🔒 ROOT REQUIRED** — must run with `sudo` for direct device access
+- **💾 UNMOUNT FIRST** — unmount filesystems before wiping
+- **🔌 STABLE POWER** — ensure uninterrupted power during operation
+- **💿 RAID ARRAYS** — handle RAID configurations with extreme care
+
+## 🛠️ Development
+
+```bash
+git clone https://github.com/41vi4p/BreakNWipe.git
+cd BreakNWipe
+pip install -e ".[dev]"
+
+make help          # All development commands
+make lint          # flake8 + mypy
+make format        # black + isort
+make test          # pytest with coverage
+```
+
+For the smart contract:
+
+```bash
+cd blockchain
+pnpm install
+npx hardhat test
+```
+
+Further reading: [docs/DESIGN.md](docs/DESIGN.md) · [docs/BLOCKCHAIN_INTEGRATION.md](docs/BLOCKCHAIN_INTEGRATION.md) · [SIH 2025 Presentation](docs/CodeBreakers_SIH25_PS1.pdf)
+
+## 👥 Team CodeBreakers
+
+| Member | Contribution |
+|--------|-------------|
+| **Blaise Rodrigues** (Team Lead) | Algorithms, Testing & Architecture Design |
+| **David Porathur** | CLI Utility, Features Integration & Architecture Design |
+| **Vanessa Rodrigues** | Next.js App, Research & Architecture Design |
+| **Natasha Lewis** | UI & Research |
+| **Chris Lopes** | Next.js App with digital signature verification |
+| **Anastasia Lopes** | UI, Frontend & Research |
 
 ## 🌟 Impact
 
-By providing trustworthy data sanitization, BreakNWipe aims to:
+- **♻️ Reduce e-waste hoarding** by building user confidence in data destruction
+- **🔄 Promote the circular economy** through safe device recycling and resource recovery (gold, copper, lithium, rare-earth metals)
+- **🇮🇳 Support Digital India & Atmanirbhar Bharat** environmental goals
+- **🏢 Enable secure ITAD** for financial services, healthcare, defense, and government
+- **🤝 Create trust** in the recycling ecosystem — aligned with UN SDGs 9 & 13
 
-- **Reduce e-waste hoarding** by building user confidence
-- **Promote circular economy** through safe device recycling
-- **Support India's environmental goals** and reduce electronic waste
-- **Enable secure IT asset disposal** for businesses and individuals
-- **Create trust** in the recycling ecosystem
+## 📄 License
 
-## 📞 Support
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
 
-- 📖 **Documentation**: [https://breaknwipe.readthedocs.io/](https://breaknwipe.readthedocs.io/)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/breaknwipe/breaknwipe/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/breaknwipe/breaknwipe/discussions)
-- 📧 **Contact**: contact@breaknwipe.org
+```
+BreakNWipe - Secure Data Wiping for Trustworthy IT Asset Recycling
+Copyright (C) 2025 CodeBreakers Team
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+```
 
 ---
 
-**🇮🇳 Made for India's e-waste solution | 🌍 Promoting global circular economy**
+<div align="center">
 
-**Developed by CodeBreakers**
+**🇮🇳 Made for India's e-waste solution | 🌍 Promoting the global circular economy**
+
+**Developed with ❤️ by Team CodeBreakers — Smart India Hackathon 2025**
+
+</div>

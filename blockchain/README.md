@@ -1,57 +1,61 @@
-# Sample Hardhat 3 Beta Project (`mocha` and `ethers`)
+# BreakNWipe Blockchain — ReportRegistryWithJson
 
-This project showcases a Hardhat 3 Beta project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+Hardhat project containing the smart contract that anchors BreakNWipe wipe certificates on the Ethereum blockchain, making them tamper-proof and independently verifiable.
 
-To learn more about the Hardhat 3 Beta, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3 Beta](https://hardhat.org/hardhat3-beta-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+## Contract: `ReportRegistryWithJson`
 
-## Project Overview
+Deployed on **Sepolia testnet** at [`0x23183BCD67664eD995ec06FF31289A7d3b0897e3`](https://sepolia.etherscan.io/address/0x23183BCD67664eD995ec06FF31289A7d3b0897e3).
 
-This example project includes:
+Three storage strategies, from cheapest to most expensive:
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+| Function | Strategy | Cost |
+|----------|----------|------|
+| `storeReportHash(bytes32)` | Store only the certificate hash | Cheapest |
+| `storeReportJSON(string)` | Emit full JSON as an event, store the hash | Moderate |
+| `storeReportOnChain(string)` | Store full JSON in contract storage | Most expensive |
 
-## Usage
+Verification / lookup functions:
 
-### Running Tests
+- `verifyReport(bytes32 reportHash)` — check that a certificate exists and get its record
+- `getStoredJson(bytes32 reportHash)` — retrieve on-chain JSON (if stored with `storeReportOnChain`)
+- `getTotalReports()` / `getReportHashByIndex(uint256)` / `getReportByHash(bytes32)` — enumeration helpers
 
-To run all the tests in the project, execute the following command:
+> ⚠️ Everything stored on-chain (including event logs) is **public**. BreakNWipe certificates contain device serials and operator names — consider hash-only storage for privacy-sensitive deployments.
 
-```shell
+## Setup
+
+```bash
+pnpm install
+
+# Configure credentials — never commit the real .env!
+cp .env.example .env
+```
+
+Required environment variables (see `.env.example`):
+
+- `SEPOLIA_RPC_URL` — RPC endpoint (e.g., Infura/Alchemy)
+- `PRIVATE_KEY` — deployer wallet private key (needs Sepolia ETH)
+- `NEXT_PUBLIC_CONTRACT_ADDRESS` — deployed contract address
+
+## Commands
+
+```bash
+# Run tests
 npx hardhat test
+
+# Deploy to a local Hardhat node
+npx hardhat node          # in one terminal
+npx hardhat run scripts/deploy.ts --network localhost
+
+# Deploy to Sepolia
+npx hardhat run scripts/deploy.ts --network sepolia
 ```
 
-You can also selectively run the Solidity or `mocha` tests:
+After deploying, update the contract address in:
 
-```shell
-npx hardhat test solidity
-npx hardhat test mocha
-```
+- `blockchain/.env` and `breaknwipe/.env`
+- `blockchain_config.json` (repo root)
 
-### Make a deployment to Sepolia
+## Integration
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
-
-To run the deployment to a local chain:
-
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
-```
-
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
-
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
-
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
-
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-```
-
-After setting the variable, you can run the deployment with the Sepolia network:
-
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
-```
+See [docs/BLOCKCHAIN_INTEGRATION.md](../docs/BLOCKCHAIN_INTEGRATION.md) for the full BreakNWipe ↔ blockchain ↔ [datawipe webapp](https://datawipe.vercel.app) verification flow.

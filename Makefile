@@ -40,7 +40,6 @@ clean:
 	rm -rf dist/
 	rm -rf *.egg-info/
 	rm -rf htmlcov/
-	rm -rf scripts/
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -type d -exec rm -rf {} +
 
@@ -49,36 +48,36 @@ build: clean
 
 package: build
 	@echo "Building distribution packages..."
-	chmod +x build_packages.sh
-	sudo ./build_packages.sh
+	chmod +x scripts/build_packages.sh
+	sudo ./scripts/build_packages.sh
 
 install-system:
 	@echo "Installing BreakNWipe system-wide..."
-	chmod +x install.sh install_requirements.sh
-	sudo ./install.sh
+	chmod +x scripts/install.sh scripts/install_requirements.sh
+	sudo ./scripts/install.sh
 	@echo ""
 	@echo "System installation complete. Now installing Python packages..."
-	./install_requirements.sh
+	./scripts/install_requirements.sh
 
 uninstall-system:
 	@echo "Removing BreakNWipe from system..."
-	chmod +x uninstall.sh
-	sudo ./uninstall.sh
+	chmod +x scripts/uninstall.sh
+	sudo ./scripts/uninstall.sh
 
-# Development shortcuts (using conda environment)
+# Development shortcuts
 run-interactive:
-	sudo /opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.cli.main --interactive
+	sudo python -m breaknwipe.cli.main --interactive
 
 run-list:
-	sudo /opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.cli.main --list-devices
+	sudo python -m breaknwipe.cli.main --list-devices
 
 run-help:
-	/opt/miniconda3/bin/conda run -n breaknwipe python -m breaknwipe.cli.main --help
+	python -m breaknwipe.cli.main --help
 
 demo:
 	@echo "Running BreakNWipe demonstration..."
-	chmod +x demo.sh
-	sudo ./demo.sh
+	chmod +x scripts/demo.sh
+	sudo ./scripts/demo.sh
 
 install-deps:
 	sudo apt-get update
@@ -87,22 +86,23 @@ install-deps:
 	sudo apt-get install -y python3-stdeb rpm ruby ruby-dev rubygems
 	sudo gem install --no-document fpm
 
-# Testing shortcuts (using conda environment)
+# Testing shortcuts
 test-algorithms:
-	/opt/miniconda3/bin/conda run -n breaknwipe python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
+	python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
 
 test-device-detection:
-	sudo /opt/miniconda3/bin/conda run -n breaknwipe python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
+	sudo python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"
 
 # Documentation
 docs:
 	@echo "Documentation available:"
 	@echo "  - README.md: Main documentation"
-	@echo "  - DESIGN.md: Architecture and design"
+	@echo "  - docs/DESIGN.md: Architecture and design"
+	@echo "  - docs/BLOCKCHAIN_INTEGRATION.md: Blockchain integration guide"
 	@echo "  - CLI help: make run-help"
 
 # Security check
 security-check:
 	@echo "Running security checks..."
-	/opt/miniconda3/bin/conda run -n breaknwipe python -c "import os; print('Root check:', os.geteuid() == 0)"
-	/opt/miniconda3/bin/conda run -n breaknwipe python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"
+	python -c "import os; print('Root check:', os.geteuid() == 0)"
+	python -c "from breaknwipe.certificate.signature import DigitalSigner; print('Crypto available:', bool(DigitalSigner()))"

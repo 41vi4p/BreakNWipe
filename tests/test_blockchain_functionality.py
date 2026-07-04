@@ -42,7 +42,7 @@ def test_internet_connectivity():
 
         if has_internet:
             # Test blockchain service connectivity
-            rpc_url = "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID"
+            rpc_url = os.environ.get("BREAKNWIPE_RPC_URL", "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID")
             blockchain_reachable = check_blockchain_service_connectivity(rpc_url, timeout=10)
             print(f"   Blockchain service: {'✅ Reachable' if blockchain_reachable else '❌ Not reachable'}")
 

@@ -17,14 +17,14 @@ with open(os.path.join(here, 'requirements.txt'), encoding='utf-8') as f:
 
 setup(
     name='breaknwipe',
-    version='1.0.0',
+    version='2.4.1',
     description='Comprehensive secure data wiping CLI utility for IT asset recycling',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='CodeBreakers Team',
     author_email='contact@breaknwipe.org',
-    url='https://github.com/breaknwipe/breaknwipe',
-    license='MIT',
+    url='https://github.com/41vi4p/BreakNWipe',
+    license='GPL-3.0-or-later',
 
     packages=find_packages(),
     python_requires='>=3.8',
@@ -43,7 +43,7 @@ setup(
         'Intended Audience :: Information Technology',
         'Topic :: System :: Systems Administration',
         'Topic :: Security',
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
@@ -57,9 +57,8 @@ setup(
     keywords='data wiping, secure erase, NIST, DoD, asset recycling, security',
 
     project_urls={
-        'Documentation': 'https://breaknwipe.readthedocs.io/',
-        'Source': 'https://github.com/breaknwipe/breaknwipe',
-        'Tracker': 'https://github.com/breaknwipe/breaknwipe/issues',
+        'Source': 'https://github.com/41vi4p/BreakNWipe',
+        'Tracker': 'https://github.com/41vi4p/BreakNWipe/issues',
     },
 
     include_package_data=True,

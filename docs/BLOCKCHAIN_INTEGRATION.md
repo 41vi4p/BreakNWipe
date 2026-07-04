@@ -48,7 +48,7 @@ The integration consists of three main components:
 
 ### 3. Datawipe Verification Webapp
 
-**Location**: `datawipe/` directory
+**Location**: separate repository — live at [datawipe.vercel.app](https://datawipe.vercel.app)
 
 **Features**:
 - QR code scanning using device camera
@@ -119,10 +119,10 @@ PRIVATE_KEY=0xYOUR_PRIVATE_KEY
 
 ```bash
 # 1. Run the setup script
-python setup_blockchain_integration.py
+python scripts/setup_blockchain_integration.py
 
 # 2. Test the integration
-python test_blockchain_integration.py
+python tests/test_blockchain_functionality.py
 
 # 3. Start the datawipe webapp
 cd datawipe
@@ -242,7 +242,7 @@ print(store.get_network_info())
 "
 
 # Test certificate generation
-python test_blockchain_integration.py
+python tests/test_blockchain_functionality.py
 ```
 
 ## Security Considerations
@@ -267,7 +267,7 @@ python test_blockchain_integration.py
 pytest breaknwipe/tests/
 
 # Integration tests
-python test_blockchain_integration.py
+python tests/test_blockchain_functionality.py
 
 # E2E tests
 cd datawipe && npm test

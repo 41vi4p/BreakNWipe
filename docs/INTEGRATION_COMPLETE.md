@@ -86,10 +86,10 @@ BREAKNWIPE_QR_INCLUDE_BLOCKCHAIN=true
 ### 3. Test the Integration
 ```bash
 # Quick test
-python simple_integration_test.py
+python tests/test_blockchain_functionality.py
 
 # Full setup verification
-python setup_blockchain_integration.py
+python scripts/setup_blockchain_integration.py
 ```
 
 ## 🔄 **Complete Workflow**
@@ -163,7 +163,7 @@ Your integration is **complete and production-ready**. Here's what happens now:
 
 If you need help:
 - Check `BLOCKCHAIN_INTEGRATION.md` for detailed documentation
-- Run `python setup_blockchain_integration.py` for diagnostics
+- Run `python scripts/setup_blockchain_integration.py` for diagnostics
 - Test individual components with the provided test scripts
 
 **🚀 Your BreakNWipe system now provides blockchain-verified, tamper-proof data wiping certificates that can be instantly verified through your datawipe webapp!**

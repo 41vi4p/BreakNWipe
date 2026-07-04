@@ -18,3 +18,7 @@
 
 # Hardhat coverage reports
 /coverage
+
+# Environment / secrets
+.env
+!.env.example

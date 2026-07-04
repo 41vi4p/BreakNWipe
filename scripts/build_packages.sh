@@ -272,7 +272,7 @@ build_appimage() {
         mkdir -p "$appdir/usr/share/icons/hicolor/256x256/apps"
 
         # Copy files
-        cp install.sh "$appdir/usr/bin/breaknwipe"
+        cp scripts/install.sh "$appdir/usr/bin/breaknwipe"
         cp breaknwipe.desktop "$appdir/usr/share/applications/" 2>/dev/null || true
 
         # Create AppRun

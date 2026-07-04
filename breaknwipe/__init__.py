@@ -13,10 +13,10 @@ Developed by CodeBreakers Team:
 - Anastasia Lopes
 """
 
-__version__ = '1.0.0'
+__version__ = '2.4.1'
 __author__ = 'CodeBreakers Team'
 __email__ = 'contact@breaknwipe.org'
-__license__ = 'MIT'
+__license__ = 'GPL-3.0-or-later'
 __credits__ = [
     'David Porathur',
     'Blaise Rodrigues',

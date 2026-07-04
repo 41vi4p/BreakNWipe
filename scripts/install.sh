@@ -463,7 +463,7 @@ run_post_install_checks() {
     # Check virtual environment
     if [[ -d "$INSTALL_DIR/venv" ]]; then
         print_success "Virtual environment exists at $INSTALL_DIR/venv"
-        print_status "Run './install_requirements.sh' to install Python packages"
+        print_status "Run './scripts/install_requirements.sh' to install Python packages"
     else
         print_warning "Virtual environment not found"
     fi
@@ -506,7 +506,7 @@ show_completion_message() {
     echo "  • Reports directory: /var/lib/breaknwipe/reports"
     echo
     echo -e "${BLUE}Next Steps:${NC}"
-    echo "  1. Install Python packages: ${GREEN}./install_requirements.sh${NC}"
+    echo "  1. Install Python packages: ${GREEN}./scripts/install_requirements.sh${NC}"
     echo "  2. Test installation: ${GREEN}sudo breaknwipe --help${NC}"
     echo "  3. Run demo: ${GREEN}sudo make demo${NC}"
     echo
@@ -523,7 +523,7 @@ show_completion_message() {
     echo
     echo -e "${YELLOW}Important Notes:${NC}"
     echo "  • System setup complete, but Python packages need separate installation"
-    echo "  • Run ${GREEN}./install_requirements.sh${NC} as regular user (no sudo)"
+    echo "  • Run ${GREEN}./scripts/install_requirements.sh${NC} as regular user (no sudo)"
     echo "  • BreakNWipe requires root privileges to access storage devices"
     echo "  • Configuration files are located in $CONFIG_DIR"
     echo

@@ -1,10 +1,39 @@
-/venv
-/breaknwipe/__pycache__
-/breaknwipe/certificate/__pycache__
-/breaknwipe/cli/__pycache__
-/breaknwipe/device/__pycache__
-/breaknwipe/wipe_engine/__pycache__
-/breaknwipe/logging/__pycache__
-/breaknwipe/tests/__pycache__
-/breaknwipe/tests/test_data/__pycache__
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment / secrets — never commit credentials
+.env
+.env.*
+!.env.example
+
+# Test artifacts
 /breaknwipe/tests/test_data/temp_files
+
+# Node / Hardhat (blockchain)
+node_modules/
+blockchain/artifacts/
+blockchain/cache/
+blockchain/types/
+blockchain/coverage/
+
+# Generated reports and certificates
+reports/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
