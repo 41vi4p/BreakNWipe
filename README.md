@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.1-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -106,6 +106,14 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 ## 🚀 Quick Start
 
 ### Installation
+
+**One-liner** (clones the repo and runs the full system installer — dedicated user, systemd service, `breaknwipe`/`bwipe` commands on PATH). As with any curl-to-bash installer, review the script before piping it into a root shell:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/quickstart.sh | sudo bash
+```
+
+**Or manually**, if you'd rather keep the checkout around for development:
 
 ```bash
 # Clone the repository

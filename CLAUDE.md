@@ -55,6 +55,8 @@ sudo ./scripts/install_dependencies.sh
 # install_dependencies.sh internally, so running it standalone first is optional).
 make install-system     # scripts/install.sh
 make uninstall-system    # scripts/uninstall.sh
+# scripts/quickstart.sh: curl-to-bash entry point that clones the repo to a
+# temp dir and hands off to install.sh, for installing without a local checkout
 make package             # scripts/build_packages.sh (.deb/.rpm, still setup.py/fpm-based)
 make demo                # scripts/demo.sh
 ```

@@ -4,6 +4,11 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.5.1] - 2026-07-04
+
+### Added
+- `scripts/quickstart.sh` — a curl-to-bash installer that clones the repository into a temp directory and hands off to `scripts/install.sh`, so a full system install needs no manual `git clone` first: `curl -fsSL .../scripts/quickstart.sh | sudo bash`
+
 ## [2.5.0] - 2026-07-04
 
 ### Added
