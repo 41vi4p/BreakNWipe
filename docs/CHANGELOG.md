@@ -4,6 +4,19 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.6.0] - 2026-07-04
+
+### Added
+- Self-hosted APT repository, published to GitHub Pages: `sudo apt install breaknwipe` with real updates via `apt upgrade`, no re-running installer scripts
+- `.github/workflows/apt-repo.yml` — builds the `.deb` and publishes a signed APT repo to the `gh-pages` branch on every `v*` tag push
+- `docs/APT_REPO_SETUP_GUIDE.md` — one-time maintainer walkthrough (GPG key generation, GitHub secret, enabling Pages); deliberately manual since the private signing key is a supply-chain-critical secret
+- README: APT install one-liner surfaced at the top and in the Installation/Uninstallation sections; "Repository Structure" and implemented-features list updated
+
+### Changed
+- `scripts/build_packages.sh` rewritten to build fully self-contained packages: BreakNWipe + all its Python dependencies are now vendored into a `uv`-managed virtual environment (same layout as `scripts/install.sh`) and wrapped with `fpm --input-type dir`, instead of fpm's `--input-type python` mechanism. That mechanism auto-detects install paths from whichever Python is active on the *build machine* — verified locally to silently bake in a broken, machine-specific path (a conda env's site-packages) when not built inside a clean container — and additionally requires `python3-packaging`/`python3-pip` just to run on modern Ubuntu/Debian (Python 3.12+ removed distutils from the stdlib). The new approach's only real runtime dependencies are the system tools BreakNWipe shells out to (`hdparm`, `nvme-cli`, `smartmontools`, `util-linux`), not Python packaging at all. Verified end-to-end in a clean Ubuntu 24.04 container: build → `apt-get install ./breaknwipe.deb` → `breaknwipe --help` all work.
+- `scripts/build_packages.sh`: fixed a stale hardcoded `PACKAGE_VERSION="1.0.0"` (now read from `breaknwipe/__init__.py`), a wrong project `URL`, `--license "MIT"` (project is GPL-3.0-or-later), an RPM build that unconditionally aborted the whole script via `set -e` when `rpmbuild` wasn't installed (now skips gracefully, matching the existing AppImage pattern), a `create_repository_metadata`/`show_build_summary`/`create_checksums` bug where `find` recursed into its own `repository/` output and double-counted/corrupted-copied packages, and two `echo` calls missing `-e` that printed literal `\033[...]` escape codes instead of color
+- `scripts/build_packages.sh` and `scripts/demo.sh`: fixed pervasive double-backslash (`\\`) line continuations that are invalid bash (should be single `\`) — multi-line `fpm`/`useradd`/`find -exec` commands were silently broken and, as far as could be determined, had never actually been executed successfully before
+
 ## [2.5.5] - 2026-07-04
 
 ### Added

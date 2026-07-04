@@ -57,9 +57,26 @@ make install-system     # scripts/install.sh
 make uninstall-system    # scripts/uninstall.sh
 # scripts/quickstart.sh: curl-to-bash entry point that clones the repo to a
 # temp dir and hands off to install.sh, for installing without a local checkout
-make package             # scripts/build_packages.sh (.deb/.rpm, still setup.py/fpm-based)
+make package             # scripts/build_packages.sh (.deb/.rpm)
 make demo                # scripts/demo.sh
 ```
+
+`scripts/build_packages.sh` builds self-contained packages: it vendors BreakNWipe + all Python
+deps into a `uv`-managed venv (same layout as `install.sh`), then wraps that directory tree with
+`fpm --input-type dir`. It deliberately does NOT use fpm's `--input-type python` — that mechanism
+auto-detects install paths from whichever Python is active on the *build machine* (verified to
+silently bake in a broken, machine-specific path, e.g. a conda env's site-packages, if built
+outside a clean container) and needs extra packages (`python3-packaging`, `python3-pip`) to even
+run on modern Ubuntu/Debian since distutils was removed from the stdlib in Python 3.12. Always
+build inside a pinned container (`docker run ... ubuntu:24.04 bash scripts/build_packages.sh`),
+never on a bare dev machine, for a build that's actually portable.
+
+`.github/workflows/apt-repo.yml` builds that `.deb` (inside the same pinned container) and
+publishes a signed APT repository to the `gh-pages` branch on every `v*` tag push, so
+`sudo apt install breaknwipe` works from `https://41vi4p.github.io/BreakNWipe/apt`. One-time
+maintainer setup (GPG key generation, GitHub secret, enabling Pages) is a manual walkthrough in
+`docs/APT_REPO_SETUP_GUIDE.md` — deliberately not automated, since the private signing key is a
+supply-chain-critical secret that shouldn't be generated or handled by an agent.
 
 Root console entry points (from `pyproject.toml`'s `[project.scripts]`): `breaknwipe` and `bwipe`, both mapping to `breaknwipe.cli.main:main`.
 

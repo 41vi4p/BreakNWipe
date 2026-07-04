@@ -3,6 +3,19 @@
 # BreakNWipe Package Builder
 # Builds .deb and .rpm packages for distribution
 #
+# Packages are self-contained: BreakNWipe's source + all its Python dependencies
+# are vendored into a uv-managed virtual environment at /opt/breaknwipe/src/.venv
+# (the same layout scripts/install.sh produces for a system-wide install), which
+# is then wrapped as a plain directory tree with `fpm --input-type dir`. This
+# deliberately avoids fpm's `--input-type python` mechanism: it auto-detects
+# install paths from whatever Python is active on the *build machine* (silently
+# baking in a broken, machine-specific path if that's a conda/pyenv env instead
+# of the system one -- verified to actually happen), and on modern Ubuntu/Debian
+# (Python 3.12+, distutils removed from the stdlib) it additionally requires
+# python3-packaging/python3-pip just to run. The dir+venv approach sidesteps all
+# of that: the only real package dependencies are the system tools BreakNWipe
+# shells out to (hdparm, nvme-cli, smartmontools, util-linux), not Python itself.
+#
 
 set -e
 
@@ -15,16 +28,17 @@ NC='\033[0m' # No Color
 
 # Configuration
 PACKAGE_NAME="breaknwipe"
-PACKAGE_VERSION="1.0.0"
+PACKAGE_VERSION="$(grep -oP "(?<=__version__ = ')[^']+" breaknwipe/__init__.py)"
 PACKAGE_RELEASE="1"
 MAINTAINER="CodeBreakers Team <contact@breaknwipe.org>"
 DESCRIPTION="Secure data wiping utility for IT asset recycling"
-URL="https://github.com/breaknwipe/breaknwipe"
+URL="https://github.com/41vi4p/BreakNWipe"
 
 # Directories
 BUILD_DIR="$(pwd)/build"
 DIST_DIR="$(pwd)/dist"
 PACKAGE_DIR="$BUILD_DIR/packages"
+PKGROOT_DIR="$BUILD_DIR/pkgroot"
 
 # Functions
 print_status() {
@@ -43,11 +57,25 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+check_build_environment() {
+    print_status "Checking build environment..."
+
+    if [[ ! -f /etc/debian_version ]]; then
+        print_warning "This does not look like a Debian/Ubuntu system (/etc/debian_version missing)."
+        print_warning "Packages are still buildable, but this has only been tested on Debian/Ubuntu."
+        print_warning "For a fully clean build, prefer running this inside a pinned container, e.g.:"
+        print_warning "  docker run --rm -v \"\$(pwd)\":/src -w /src ubuntu:24.04 bash scripts/build_packages.sh"
+    fi
+}
+
 check_dependencies() {
     print_status "Checking build dependencies..."
 
-    # Check for required tools
-    required_tools=("python3" "python3-setuptools" "dpkg-deb" "fpm")
+    # Check for required tools. Note: python3 itself is NOT required on the build
+    # machine -- `uv sync` provisions its own managed Python inside the vendored
+    # venv, so the build toolchain only needs ruby/fpm (packaging) and uv (staging
+    # the venv) plus rsync/dpkg-dev for the mechanics.
+    required_tools=("ruby" "dpkg-deb" "fpm" "uv" "rsync")
     missing_tools=()
 
     for tool in "${required_tools[@]}"; do
@@ -60,15 +88,18 @@ check_dependencies() {
         print_error "Missing required tools: ${missing_tools[*]}"
         print_status "Installing missing dependencies..."
 
-        # Install missing tools
         apt update
-        apt install -y python3 python3-setuptools dpkg-dev
+        apt install -y ruby ruby-dev rubygems build-essential dpkg-dev rsync curl ca-certificates
 
-        # Install fpm if not available
         if ! command -v fpm &> /dev/null; then
             print_status "Installing fpm (Effing Package Management)..."
-            apt install -y ruby ruby-dev rubygems build-essential
             gem install --no-document fpm
+        fi
+
+        if ! command -v uv &> /dev/null; then
+            print_status "Installing uv..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
         fi
     fi
 
@@ -81,9 +112,23 @@ prepare_build_environment() {
     # Clean previous builds
     rm -rf "$BUILD_DIR" "$DIST_DIR"
     mkdir -p "$BUILD_DIR" "$DIST_DIR" "$PACKAGE_DIR"
+    mkdir -p "$PKGROOT_DIR/opt/breaknwipe/src" "$PKGROOT_DIR/usr/bin"
 
-    # Create source distribution
-    python3 setup.py sdist
+    print_status "Staging source + uv-managed virtual environment..."
+    rsync -a \
+        --exclude='.git' --exclude='.venv' --exclude='venv' \
+        --exclude='__pycache__' --exclude='*.egg-info' \
+        --exclude='build' --exclude='dist' --exclude='node_modules' \
+        ./ "$PKGROOT_DIR/opt/breaknwipe/src/"
+
+    (cd "$PKGROOT_DIR/opt/breaknwipe/src" && uv sync --no-dev)
+
+    cat > "$PKGROOT_DIR/usr/bin/breaknwipe" << 'EOF'
+#!/bin/bash
+exec /opt/breaknwipe/src/.venv/bin/python -m breaknwipe.cli.main "$@"
+EOF
+    chmod +x "$PKGROOT_DIR/usr/bin/breaknwipe"
+    ln -sf breaknwipe "$PKGROOT_DIR/usr/bin/bwipe"
 
     print_success "Build environment prepared"
 }
@@ -94,70 +139,75 @@ build_deb_package() {
     local deb_dir="$PACKAGE_DIR/deb"
     mkdir -p "$deb_dir"
 
-    # Use fpm to build .deb package
-    fpm \\
-        --input-type python \\
-        --output-type deb \\
-        --name "$PACKAGE_NAME" \\
-        --version "$PACKAGE_VERSION" \\
-        --iteration "$PACKAGE_RELEASE" \\
-        --maintainer "$MAINTAINER" \\
-        --description "$DESCRIPTION" \\
-        --url "$URL" \\
-        --license "MIT" \\
-        --vendor "CodeBreakers Team" \\
-        --category "admin" \\
-        --architecture "all" \\
-        --depends "python3 >= 3.8" \\
-        --depends "python3-pip" \\
-        --depends "smartmontools" \\
-        --depends "hdparm" \\
-        --depends "nvme-cli" \\
-        --depends "util-linux" \\
-        --package "$deb_dir" \\
-        --after-install scripts/postinst \\
-        --before-remove scripts/prerm \\
-        --after-remove scripts/postrm \\
-        --deb-suggests "parted" \\
-        --deb-suggests "lsblk" \\
-        setup.py
+    # Package the pre-built pkgroot/ (source + uv venv + wrapper) as a plain
+    # directory tree. No python3 dependency is declared: the venv is fully
+    # self-contained (uv provisions its own Python), and its compiled
+    # extensions (numpy, cryptography, pydantic-core, ...) are architecture-
+    # specific, hence --architecture amd64 rather than the old "all".
+    fpm \
+        --input-type dir \
+        --output-type deb \
+        --name "$PACKAGE_NAME" \
+        --version "$PACKAGE_VERSION" \
+        --iteration "$PACKAGE_RELEASE" \
+        --maintainer "$MAINTAINER" \
+        --description "$DESCRIPTION" \
+        --url "$URL" \
+        --license "GPL-3.0-or-later" \
+        --vendor "CodeBreakers Team" \
+        --category "admin" \
+        --architecture "amd64" \
+        --depends "smartmontools" \
+        --depends "hdparm" \
+        --depends "nvme-cli" \
+        --depends "util-linux" \
+        --package "$deb_dir" \
+        --after-install scripts/postinst \
+        --before-remove scripts/prerm \
+        --after-remove scripts/postrm \
+        --deb-suggests "parted" \
+        --deb-suggests "lsblk" \
+        -C "$PKGROOT_DIR" opt usr
 
-    print_success "Debian package built: $deb_dir/${PACKAGE_NAME}_${PACKAGE_VERSION}-${PACKAGE_RELEASE}_all.deb"
+    print_success "Debian package built: $deb_dir/${PACKAGE_NAME}_${PACKAGE_VERSION}-${PACKAGE_RELEASE}_amd64.deb"
 }
 
 build_rpm_package() {
     print_status "Building RPM package..."
 
+    if ! command -v rpmbuild &> /dev/null; then
+        print_warning "rpmbuild not found, skipping RPM package (install 'rpm' to enable this)"
+        return 0
+    fi
+
     local rpm_dir="$PACKAGE_DIR/rpm"
     mkdir -p "$rpm_dir"
 
-    # Use fpm to build .rpm package
-    fpm \\
-        --input-type python \\
-        --output-type rpm \\
-        --name "$PACKAGE_NAME" \\
-        --version "$PACKAGE_VERSION" \\
-        --iteration "$PACKAGE_RELEASE" \\
-        --maintainer "$MAINTAINER" \\
-        --description "$DESCRIPTION" \\
-        --url "$URL" \\
-        --license "MIT" \\
-        --vendor "CodeBreakers Team" \\
-        --category "Applications/System" \\
-        --architecture "noarch" \\
-        --depends "python3 >= 3.8" \\
-        --depends "python3-pip" \\
-        --depends "smartmontools" \\
-        --depends "hdparm" \\
-        --depends "nvme-cli" \\
-        --depends "util-linux" \\
-        --package "$rpm_dir" \\
-        --after-install scripts/postinst \\
-        --before-remove scripts/prerm \\
-        --after-remove scripts/postrm \\
-        setup.py
+    # Same self-contained pkgroot/ as build_deb_package -- see its comment above.
+    fpm \
+        --input-type dir \
+        --output-type rpm \
+        --name "$PACKAGE_NAME" \
+        --version "$PACKAGE_VERSION" \
+        --iteration "$PACKAGE_RELEASE" \
+        --maintainer "$MAINTAINER" \
+        --description "$DESCRIPTION" \
+        --url "$URL" \
+        --license "GPL-3.0-or-later" \
+        --vendor "CodeBreakers Team" \
+        --category "Applications/System" \
+        --architecture "x86_64" \
+        --depends "smartmontools" \
+        --depends "hdparm" \
+        --depends "nvme-cli" \
+        --depends "util-linux" \
+        --package "$rpm_dir" \
+        --after-install scripts/postinst \
+        --before-remove scripts/prerm \
+        --after-remove scripts/postrm \
+        -C "$PKGROOT_DIR" opt usr
 
-    print_success "RPM package built: $rpm_dir/${PACKAGE_NAME}-${PACKAGE_VERSION}-${PACKAGE_RELEASE}.noarch.rpm"
+    print_success "RPM package built: $rpm_dir/${PACKAGE_NAME}-${PACKAGE_VERSION}-${PACKAGE_RELEASE}.x86_64.rpm"
 }
 
 create_package_scripts() {
@@ -179,8 +229,8 @@ if ! getent group breaknwipe > /dev/null 2>&1; then
 fi
 
 if ! getent passwd breaknwipe > /dev/null 2>&1; then
-    useradd --system --gid breaknwipe --shell /bin/false \\
-            --home-dir /opt/breaknwipe --no-create-home \\
+    useradd --system --gid breaknwipe --shell /bin/false \
+            --home-dir /opt/breaknwipe --no-create-home \
             breaknwipe
 fi
 
@@ -296,8 +346,10 @@ create_checksums() {
 
     cd "$PACKAGE_DIR"
 
-    # Create checksums for all packages
-    find . -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" | while read -r file; do
+    # Create checksums for all packages. Excludes repository/ since that's a
+    # copy of these same files created later by create_repository_metadata()
+    # -- without the exclusion this would checksum each package twice.
+    find . -not -path "*/repository/*" \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) | while read -r file; do
         if [[ -f "$file" ]]; then
             sha256sum "$file" > "${file}.sha256"
             md5sum "$file" > "${file}.md5"
@@ -309,7 +361,7 @@ create_checksums() {
         echo "# BreakNWipe $PACKAGE_VERSION Package Checksums"
         echo "# Generated on $(date)"
         echo ""
-        find . -name "*.sha256" -exec cat {} \\;
+        find . -name "*.sha256" -exec cat {} \;
     } > "checksums.txt"
 
     cd - > /dev/null
@@ -322,9 +374,11 @@ create_repository_metadata() {
     local repo_dir="$PACKAGE_DIR/repository"
     mkdir -p "$repo_dir/deb" "$repo_dir/rpm"
 
-    # Copy packages to repository structure
-    find "$PACKAGE_DIR" -name "*.deb" -exec cp {} "$repo_dir/deb/" \\;
-    find "$PACKAGE_DIR" -name "*.rpm" -exec cp {} "$repo_dir/rpm/" \\;
+    # Copy packages to repository structure. Search only the specific deb/rpm
+    # output dirs (not all of $PACKAGE_DIR) so this doesn't recurse into
+    # $repo_dir itself, which lives nested under $PACKAGE_DIR/repository.
+    find "$PACKAGE_DIR/deb" -maxdepth 1 -name "*.deb" -exec cp {} "$repo_dir/deb/" \;
+    find "$PACKAGE_DIR/rpm" -maxdepth 1 -name "*.rpm" -exec cp {} "$repo_dir/rpm/" \; 2>/dev/null || true
 
     # Create APT repository (basic)
     cd "$repo_dir/deb"
@@ -351,7 +405,7 @@ show_build_summary() {
     echo
     echo -e "${BLUE}Built packages:${NC}"
 
-    find "$PACKAGE_DIR" -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" | while read -r file; do
+    find "$PACKAGE_DIR" -not -path "*/repository/*" \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) | while read -r file; do
         if [[ -f "$file" ]]; then
             size=$(du -h "$file" | cut -f1)
             echo "  • $(basename "$file") ($size)"
@@ -365,8 +419,8 @@ show_build_summary() {
     echo "  • Repository: $PACKAGE_DIR/repository/"
     echo
     echo -e "${BLUE}Installation commands:${NC}"
-    echo "  • Debian/Ubuntu: ${GREEN}sudo dpkg -i breaknwipe_*.deb${NC}"
-    echo "  • Red Hat/Fedora: ${GREEN}sudo rpm -i breaknwipe-*.rpm${NC}"
+    echo -e "  • Debian/Ubuntu: ${GREEN}sudo dpkg -i breaknwipe_*.deb${NC}"
+    echo -e "  • Red Hat/Fedora: ${GREEN}sudo rpm -i breaknwipe-*.rpm${NC}"
     echo
     echo -e "${BLUE}Repository setup:${NC}"
     echo "  • For APT: Copy deb/ contents to your repository"
@@ -383,6 +437,7 @@ main() {
     echo "=================================="
     echo
 
+    check_build_environment
     check_dependencies
     prepare_build_environment
     create_package_scripts

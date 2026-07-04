@@ -204,11 +204,11 @@ for device in devices:
 
         echo
         print_status "Simulating NIST Clear algorithm..."
-        timeout 30 python -m breaknwipe.cli.main wipe \\
-            --device "$device_path" \\
-            --algorithm nist-clear \\
-            --dry-run \\
-            --certificate \\
+        timeout 30 python -m breaknwipe.cli.main wipe \
+            --device "$device_path" \
+            --algorithm nist-clear \
+            --dry-run \
+            --certificate \
             --output ./demo_reports/ || true
 
     else

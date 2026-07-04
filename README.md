@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.5.5-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -23,7 +23,15 @@
 
 ---
 
-**Install** (Ubuntu/Debian, x86_64 — [details](#installation)):
+**Install via APT** (Ubuntu/Debian, x86_64 — [details](#installation), one-time repo setup, then `apt upgrade` handles updates forever):
+
+```bash
+curl -fsSL https://41vi4p.github.io/BreakNWipe/apt/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/breaknwipe.gpg
+echo "deb [signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
+sudo apt update && sudo apt install breaknwipe
+```
+
+**Or install via the one-liner script** ([details](#installation)):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/quickstart.sh | sudo bash
@@ -108,6 +116,7 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 - [x] **Web GUI** — FastAPI + WebSocket interface with real-time progress, speed, and ETA (`--gui`)
 - [x] **Batch processing** of multiple devices from a config file
 - [x] `.deb` / `.rpm` package build scripts and system installer
+- [x] **Self-hosted APT repository** (GitHub Pages) — `sudo apt install breaknwipe` with real updates via `apt upgrade`
 
 ### 🚧 Planned / Not Yet Implemented
 
@@ -125,9 +134,20 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 
 ### Installation
 
-> **OS support:** the installer scripts (`quickstart.sh`, `install_dependencies.sh`, `install.sh`, and `make install-system`) target **Ubuntu/Debian on x86_64** — they shell out to `apt` for system packages (`hdparm`, `nvme-cli`, `smartmontools`, etc.) and check for `apt` up front, so they will refuse to run on Fedora/RHEL, Arch, macOS, or non-x86_64 hosts. `uv sync` / `pip install -e .` on their own are platform-agnostic (any Linux/macOS with Python), but you'll still need to provide `hdparm`/`nvme-cli`/`smartmontools` yourself via your distro's package manager for device-level operations to work.
+> **OS support:** everything below (the APT repo, `quickstart.sh`, `install_dependencies.sh`, `install.sh`, and `make install-system`) targets **Ubuntu/Debian on x86_64** — they shell out to `apt` for system packages (`hdparm`, `nvme-cli`, `smartmontools`, etc.). `uv sync` / `pip install -e .` on their own are platform-agnostic (any Linux/macOS with Python), but you'll still need to provide `hdparm`/`nvme-cli`/`smartmontools` yourself via your distro's package manager for device-level operations to work.
 
-**One-liner (Ubuntu/Debian, x86_64 only)** — clones the repo and runs the full system installer (dedicated user, systemd service, `breaknwipe`/`bwipe` commands on PATH). As with any curl-to-bash installer, review the script before piping it into a root shell:
+**APT repository (recommended)** — a real, signed APT repo self-hosted on GitHub Pages. One-time setup, then every future release is a normal `sudo apt update && sudo apt upgrade`, no re-running installer scripts:
+
+```bash
+curl -fsSL https://41vi4p.github.io/BreakNWipe/apt/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/breaknwipe.gpg
+echo "deb [signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
+sudo apt update
+sudo apt install breaknwipe
+```
+
+The package is fully self-contained (BreakNWipe + all its Python dependencies are vendored into a `uv`-managed virtual environment at build time), so it doesn't pull in a web of `python3-*` system packages — just the device tools BreakNWipe actually shells out to (`hdparm`, `nvme-cli`, `smartmontools`, `util-linux`). Built and published by [`.github/workflows/apt-repo.yml`](.github/workflows/apt-repo.yml) on every tagged release; see [`docs/APT_REPO_SETUP_GUIDE.md`](docs/APT_REPO_SETUP_GUIDE.md) for the one-time maintainer setup.
+
+**One-liner script** — clones the repo and runs the full system installer (dedicated user, systemd service, `breaknwipe`/`bwipe` commands on PATH). As with any curl-to-bash installer, review the script before piping it into a root shell:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/quickstart.sh | sudo bash
@@ -155,6 +175,14 @@ sudo make install-system
 ```
 
 ### Uninstallation
+
+**If you installed via APT:**
+
+```bash
+sudo apt remove breaknwipe          # keep config/data
+sudo apt purge breaknwipe           # also remove config/data
+sudo rm /etc/apt/sources.list.d/breaknwipe.list   # stop tracking the repo entirely
+```
 
 **If you still have the repo cloned:**
 
@@ -248,8 +276,10 @@ BreakNWipe/
 ├── blockchain/           # Hardhat project — ReportRegistryWithJson contract
 ├── frontend_ui/          # Web GUI static files (HTML/CSS)
 ├── docs/                 # Design docs, integration guides, SIH presentation
+│   └── apt/pubkey.gpg    #   APT repo signing public key (see APT_REPO_SETUP_GUIDE.md)
 ├── scripts/              # Install, packaging, demo & setup scripts
 ├── tests/                # Integration test scripts
+├── .github/workflows/    # CI: builds & publishes the APT repo on tagged releases
 ├── Makefile              # Development commands (make help)
 ├── pyproject.toml        # Package metadata & dependencies (uv-managed)
 └── setup.py              # No-op shim kept for `python setup.py sdist`
