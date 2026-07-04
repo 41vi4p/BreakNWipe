@@ -1,6 +1,6 @@
 [project]
 name = "breaknwipe"
-version = "2.6.1"
+version = "2.6.2"
 description = "Comprehensive secure data wiping CLI utility for IT asset recycling"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

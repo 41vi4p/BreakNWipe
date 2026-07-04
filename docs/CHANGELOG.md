@@ -4,6 +4,11 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.6.2] - 2026-07-05
+
+### Changed
+- `.github/workflows/apt-repo.yml`: bumped `actions/checkout` from `v4` to `v5` to clear a GitHub Actions deprecation warning ("Node.js 20 is deprecated... actions/checkout@v4 forced to run on Node.js 24") — cosmetic, did not affect the `2.6.1` build/publish, which succeeded
+
 ## [2.6.1] - 2026-07-05
 
 ### Fixed
