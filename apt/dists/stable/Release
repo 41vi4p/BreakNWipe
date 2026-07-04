@@ -1,0 +1,24 @@
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Sat, 04 Jul 2026 21:59:18 +0000
+Description: BreakNWipe APT repository
+Label: BreakNWipe
+Origin: BreakNWipe
+Suite: stable
+MD5Sum:
+ d78e8d2a57507df1dd0fb88cad17dfa0              183 Release
+ ac934ab2d343c46c4985f4ff55909ac8              647 main/binary-amd64/Packages
+ 881fbdce6aa6290ac4078ed2d74b9bb2              478 main/binary-amd64/Packages.gz
+SHA1:
+ 391738911a50534e1040c1376866ae9068ee628d              183 Release
+ df90c8db7f88dea7f649562ffce2e7aede7e2e2d              647 main/binary-amd64/Packages
+ 46690a8bf99ba77cb15fe4b7cd20d8199b73e8df              478 main/binary-amd64/Packages.gz
+SHA256:
+ be01311974e15cde7d14f8d58644293148e56b50f68e5f9b156af4344385eca1              183 Release
+ e162352e708cb96d46f5d61233367e75998d49b9c70d889d9fd731bf29f79ced              647 main/binary-amd64/Packages
+ 6878d15c5c592655e339dae5b121ab533cc518b8bba491ed66ef5f5439aa1b44              478 main/binary-amd64/Packages.gz
+SHA512:
+ 9d5e0937ff96706a2fcd0f2fc2577e267e336784d58861a05340db3e0f009ae8f5f5851a56b8af7e77b2e9940899720987c6d8ed3bfd0bfb87463e81d0c53fa0              183 Release
+ 91b062f70a5185d03765bf0a0a3c17edd4d1f47c69abcb842a9f975a55915d19707f1846a33f5b01ee64cd1b6f8fe391e5f43f320b8af72d6ffb8208786298fc              647 main/binary-amd64/Packages
+ 665d294f73bead74da3be8dbba6dd331eef194111428271d6b5ab3577b543959c5057e9f7e1753e1c6b85261c14a35042384bd12de40749a6be7e4bc507ce938              478 main/binary-amd64/Packages.gz
