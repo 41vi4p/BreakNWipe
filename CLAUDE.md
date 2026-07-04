@@ -10,34 +10,44 @@ BreakNWipe is a secure data-wiping CLI/web utility built for Smart India Hackath
 
 **Every change in this repository must increment the version.** The version lives in two places and both must be updated together:
 - `breaknwipe/__init__.py` → `__version__`
-- `setup.py` → `version=`
+- `pyproject.toml` → `version =`
+
+(`setup.py` is a no-op shim retained only so `python setup.py sdist`/`bdist_wheel` keep working for `scripts/build_packages.sh`; it has no version of its own — all metadata lives in `pyproject.toml`.)
 
 Use semver: patch bump (`x.y.Z`) for fixes/docs/chores, minor bump (`x.Y.0`) for new features, major bump (`X.0.0`) for breaking changes. After bumping, add an entry to `docs/CHANGELOG.md` (Keep a Changelog format) and update the version badge in `README.md`.
 
 ## Commands
 
-```bash
-# Install for development
-pip install -e ".[dev]"
+Dependencies and the dev environment are managed with [uv](https://docs.astral.sh/uv/); `pyproject.toml` is the single source of truth for metadata and dependencies (`uv.lock` pins exact versions and is committed). `requirements.txt` and `setup.py` are legacy/compat artifacts kept only for the shell scripts under `scripts/` — don't hand-edit dependency versions there, add them to `pyproject.toml` instead (`uv add <pkg>`, `uv add --dev <pkg>` for dev-only tools) and re-run `uv sync`.
 
-# Run the CLI
-sudo python -m breaknwipe.cli.main --interactive   # guided wizard
-sudo python -m breaknwipe.cli.main --gui           # FastAPI web GUI at :8000
-sudo python -m breaknwipe.cli.main --list-devices
-python -m breaknwipe.cli.main --help
+```bash
+# Install for development (creates .venv, installs deps + dev group from pyproject.toml)
+uv sync
+
+# Add / remove a dependency (updates pyproject.toml + uv.lock)
+uv add <package>
+uv add --dev <package>       # dev-only tool (pytest, black, etc.)
+uv remove <package>
+
+# Run the CLI (uv run resolves the project's .venv automatically)
+sudo uv run python -m breaknwipe.cli.main --interactive   # guided wizard
+sudo uv run python -m breaknwipe.cli.main --gui           # FastAPI web GUI at :8000
+sudo uv run python -m breaknwipe.cli.main --list-devices
+uv run python -m breaknwipe.cli.main --help
 
 # Lint / format
-make lint      # flake8 breaknwipe tests && mypy breaknwipe
-make format    # black breaknwipe tests && isort breaknwipe tests
+make lint      # uv run flake8 breaknwipe tests && uv run mypy breaknwipe
+make format    # uv run black breaknwipe tests && uv run isort breaknwipe tests
 
 # Tests
 # NOTE: no pytest unit-test suite currently exists (breaknwipe/tests/ is referenced
 # by the Makefile but not present). `tests/` at repo root holds two standalone
 # integration scripts, run directly:
-python tests/test_blockchain_functionality.py
-python tests/test_qr_consistency.py
+uv run python tests/test_blockchain_functionality.py
+uv run python tests/test_qr_consistency.py
 
 # Package building / system install (see scripts/, all destructive — confirm with user)
+# These target end-user machines and intentionally use pip/requirements.txt, not uv.
 make install-system     # scripts/install.sh + scripts/install_requirements.sh
 make uninstall-system    # scripts/uninstall.sh
 make package             # scripts/build_packages.sh (.deb/.rpm)

@@ -21,19 +21,18 @@ install:
 	pip install .
 
 dev-install:
-	pip install -r requirements.txt
-	pip install -e ".[dev]"
+	uv sync
 
 test:
-	pytest tests/ -v --cov=breaknwipe --cov-report=html
+	uv run pytest tests/ -v --cov=breaknwipe --cov-report=html
 
 lint:
-	flake8 breaknwipe tests
-	mypy breaknwipe
+	uv run flake8 breaknwipe tests
+	uv run mypy breaknwipe
 
 format:
-	black breaknwipe tests
-	isort breaknwipe tests
+	uv run black breaknwipe tests
+	uv run isort breaknwipe tests
 
 clean:
 	rm -rf build/
@@ -88,7 +87,7 @@ install-deps:
 
 # Testing shortcuts
 test-algorithms:
-	python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
+	uv run python -c "from breaknwipe.wipe_engine.algorithms import list_available_algorithms; import json; print(json.dumps(list_available_algorithms(), indent=2))"
 
 test-device-detection:
 	sudo python -c "from breaknwipe.device.detector import DeviceDetector; d = DeviceDetector(); [print(f'{dev.path}: {dev.model} ({dev.capacity_human})') for dev in d.list_devices()]"

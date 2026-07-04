@@ -1,0 +1,88 @@
+[project]
+name = "breaknwipe"
+version = "2.4.3"
+description = "Comprehensive secure data wiping CLI utility for IT asset recycling"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "CodeBreakers Team", email = "contact@breaknwipe.org" }]
+requires-python = ">=3.8"
+keywords = ["data wiping", "secure erase", "NIST", "DoD", "asset recycling", "security"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Security",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: Console",
+]
+
+dependencies = [
+    "click>=8.0.0",
+    "psutil>=5.8.0",
+    "colorama>=0.4.4",
+    "tqdm>=4.62.0",
+    "rich>=12.0.0",
+    "cryptography>=3.4.8",
+    "pycryptodome>=3.15.0",
+    "reportlab>=3.6.0",
+    "qrcode[pil]>=7.3.1",
+    "Pillow>=9.0.0",
+    "pydantic>=1.9.0",
+    "jsonschema>=4.4.0",
+    "pyyaml>=6.0",
+    "pyudev>=0.23.0",
+    "structlog>=21.5.0",
+    "prometheus-client>=0.14.0",
+    "numpy>=1.21.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "websockets>=11.0.0",
+    "aiofiles>=23.2.1",
+    "web3>=6.0.0",
+    "eth-account>=0.8.0",
+    "requests>=2.28.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/41vi4p/BreakNWipe"
+Source = "https://github.com/41vi4p/BreakNWipe"
+Tracker = "https://github.com/41vi4p/BreakNWipe/issues"
+
+[project.scripts]
+breaknwipe = "breaknwipe.cli.main:main"
+bwipe = "breaknwipe.cli.main:main"
+
+[project.optional-dependencies]
+docs = ["sphinx>=5.0", "sphinx-rtd-theme>=1.0"]
+# 'web' and 'blockchain' extras are kept for pip compatibility; those packages
+# are already required unconditionally above (see requirements.txt history).
+web = ["fastapi>=0.104.0", "uvicorn[standard]>=0.24.0", "websockets>=11.0.0", "aiofiles>=23.2.1"]
+blockchain = ["web3>=6.0.0", "eth-account>=0.8.0", "requests>=2.28.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=22.0",
+    "flake8>=5.0",
+    "mypy>=1.0",
+    "isort>=5.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["breaknwipe*"]
+
+[tool.setuptools.package-data]
+breaknwipe = ["data/*", "templates/*"]

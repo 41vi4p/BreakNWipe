@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.4.2-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.3-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -112,11 +112,12 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 git clone https://github.com/41vi4p/BreakNWipe.git
 cd BreakNWipe
 
-# Install from source
-pip install -e .
+# Install with uv (recommended — creates a .venv and installs from pyproject.toml/uv.lock)
+uv sync
 
-# Or with optional extras
-pip install -e ".[web,blockchain]"
+# Or install from source with pip
+pip install -e .
+pip install -e ".[web,blockchain]"   # with optional extras
 
 # Or full system install (installs dependencies like hdparm, nvme-cli)
 make install-system
@@ -223,12 +224,16 @@ BreakNWipe/
 ```bash
 git clone https://github.com/41vi4p/BreakNWipe.git
 cd BreakNWipe
-pip install -e ".[dev]"
+uv sync             # installs deps + dev tools (pytest, black, flake8, mypy, isort)
 
 make help          # All development commands
-make lint          # flake8 + mypy
-make format        # black + isort
-make test          # pytest with coverage
+make lint          # uv run flake8 + mypy
+make format        # uv run black + isort
+make test          # uv run pytest with coverage
+
+# Add/remove a dependency
+uv add <package>
+uv add --dev <package>
 ```
 
 For the smart contract:
