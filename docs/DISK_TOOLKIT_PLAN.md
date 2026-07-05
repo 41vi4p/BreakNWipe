@@ -1,6 +1,6 @@
 # BreakNWipe → complete disk toolkit — roadmap
 
-**Status: Phase 1 in progress; Phases 2–4 planned.** This document is the roadmap for growing
+**Status: Phases 1 & 2 shipped; Phases 3–4 planned.** This document is the roadmap for growing
 BreakNWipe from a secure-wipe utility into a general-purpose, genuinely usable disk toolkit — one
 that beats GParted / testdisk / GNOME-Disks on *approachability* while keeping the wipe + tamper-
 proof certificate as a flagship feature. The name stays **BreakNWipe**; positioning broadens.
@@ -39,14 +39,14 @@ still just the Python venv.
 
 ## Phases
 
-### Phase 1 — GUI foundation: redesign + theming + repositioning (→ v3.0.0) *(current)*
+### Phase 1 — GUI foundation: redesign + theming + repositioning ✅ shipped (v3.0.0)
 Stand up the Next app, a real light/dark design system, and re-implement **all existing features**
 (device list, health, partitions, fsck, wipe + progress + certificate, logs, reports, about)
 against the **unchanged** backend API. Retire the old `frontend_ui/` once at parity. Add a Node
 build stage to `scripts/build_packages.sh` / `scripts/install.sh`. Broaden README/CLAUDE.md
 positioning. Low risk — no backend logic changes except how static files are served.
 
-### Phase 2 — Partition management: full resize (grow / shrink / move) + extend-root/VM flow
+### Phase 2 — Partition management: full resize (grow / shrink / move) + extend-root/VM flow ✅ *shipped (v3.1.0)*
 New isolated `breaknwipe/device/partition.py` (same safety discipline as `fsck.py`), shelling out
 to `growpart`, `parted`/`sfdisk`, `resize2fs`/`ntfsresize`/`xfs_growfs`/`btrfs`, and
 `pvresize`/`lvextend` (LVM). Headline UX: **detect the situation and offer the one right action** —

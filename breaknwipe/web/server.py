@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 from .models import (
     ApiResponse, DeviceInfo, WipeRequest, WipeSession, WipeProgress,
     WebSocketMessage, WipeSessionStatus, PartitionModel, DeviceHealthModel,
-    FsckCheckRequest
+    FsckCheckRequest, PartitionResizeRequest, LvExtendRequest
 )
 from .session_manager import WipeSessionManager
 from ..device.filesystem import list_partitions
@@ -181,6 +181,71 @@ class WebServer:
             except Exception as e:
                 logger.exception(f"fsck failed for {request.partition}")
                 raise HTTPException(status_code=500, detail="fsck failed. See server logs for details.")
+
+        # ---- Partition management (sync handlers -> thread pool; blocking subprocess) ----
+
+        @self.app.get("/api/devices/{device_path:path}/partition-table")
+        def get_partition_table_endpoint(device_path: str):
+            """Full disk layout: partitions + free-space gaps + table type + LVM state."""
+            device_path = "/" + device_path if not device_path.startswith("/") else device_path
+            try:
+                from ..device.partition import get_disk_layout, list_logical_volumes
+                layout = get_disk_layout(device_path).to_dict()
+                layout["logical_volumes"] = list_logical_volumes()
+                return JSONResponse(content=layout)
+            except Exception:
+                logger.exception(f"Partition-table read failed for {device_path}")
+                raise HTTPException(status_code=500, detail="Partition-table read failed. See server logs for details.")
+
+        @self.app.post("/api/partition/resize")
+        def partition_resize_endpoint(request: PartitionResizeRequest):
+            """
+            Plan (dry_run) or apply a partition resize. All safety gates live in
+            PartitionResizer (validated paths, never auto-unmounts, refuses
+            offline ops on mounted filesystems, system-disk/experimental-move
+            force gates) and apply here identically to the CLI -- the client
+            cannot bypass them.
+            """
+            try:
+                from ..device.partition import PartitionResizer
+                resizer = PartitionResizer()
+                mode = request.mode
+
+                if request.dry_run:
+                    if mode == "grow":
+                        plan = resizer.plan_grow(request.partition, force=request.force)
+                    elif mode == "shrink":
+                        plan = resizer.plan_shrink(request.partition, request.target_bytes or 0, force=request.force)
+                    elif mode == "move":
+                        plan = resizer.plan_move(request.partition, request.new_start_sector or 0, force=request.force)
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Unknown resize mode '{mode}'.")
+                    return JSONResponse(content=plan.to_dict())
+
+                if mode == "grow":
+                    result = resizer.grow(request.partition, force=request.force)
+                elif mode == "shrink":
+                    result = resizer.shrink(request.partition, request.target_bytes or 0, force=request.force)
+                elif mode == "move":
+                    result = resizer.move(request.partition, request.new_start_sector or 0, force=request.force)
+                else:
+                    raise HTTPException(status_code=400, detail=f"Unknown resize mode '{mode}'.")
+                return JSONResponse(content=result.to_dict())
+            except HTTPException:
+                raise
+            except Exception:
+                logger.exception(f"Partition resize failed for {request.partition}")
+                raise HTTPException(status_code=500, detail="Partition resize failed. See server logs for details.")
+
+        @self.app.post("/api/lvm/extend")
+        def lvm_extend_endpoint(request: LvExtendRequest):
+            """Extend an LVM logical volume (and its filesystem) to fill free VG space."""
+            try:
+                from ..device.partition import extend_lv
+                return JSONResponse(content=extend_lv(request.lv_path).to_dict())
+            except Exception:
+                logger.exception(f"LV extend failed for {request.lv_path}")
+                raise HTTPException(status_code=500, detail="LV extend failed. See server logs for details.")
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):

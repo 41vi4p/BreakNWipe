@@ -296,6 +296,73 @@ def fsck(partition, repair, force, filesystem):
     if not result.success:
         sys.exit(1)
 
+
+@main.command()
+@click.argument('partition', shell_complete=complete_device_path)
+@click.option('--mode', type=click.Choice(['grow', 'shrink', 'move']), default='grow',
+              help='grow (into free space), shrink (offline), or move (experimental, offline)')
+@click.option('--size', type=int, default=None, help='Target size in bytes (for --mode shrink)')
+@click.option('--start', type=int, default=None, help='New start sector (for --mode move)')
+@click.option('--apply', 'do_apply', is_flag=True, help='Apply the change (default: preview only)')
+@click.option('--force', is_flag=True, help='Confirm system-disk / experimental-move operations')
+def resize(partition, mode, size, start, do_apply, force):
+    """Resize a PARTITION: grow into free space, shrink, or move.
+
+    Previews the exact commands by default; pass --apply to run them. Grow can be
+    done live (ext4/XFS/Btrfs); shrink and move require the partition to be
+    unmounted. The common 'my VM/root disk grew but the partition didn't' case is
+    a plain `resize <partition> --mode grow --apply`.
+    """
+    from ..device.partition import PartitionResizer
+
+    resizer = PartitionResizer()
+
+    # Always compute the plan first (preview-first).
+    if mode == 'grow':
+        plan = resizer.plan_grow(partition, force=force)
+    elif mode == 'shrink':
+        if size is None:
+            console.print("[red]--size (bytes) is required for --mode shrink[/red]")
+            sys.exit(1)
+        plan = resizer.plan_shrink(partition, size, force=force)
+    else:
+        if start is None:
+            console.print("[red]--start (sector) is required for --mode move[/red]")
+            sys.exit(1)
+        plan = resizer.plan_move(partition, start, force=force)
+
+    if plan.refused:
+        console.print(f"[red]Refused:[/red] {plan.refusal_reason}")
+        sys.exit(1)
+
+    console.print(f"[blue]Plan ({mode}) for {partition}:[/blue]")
+    console.print(f"  {plan.current_bytes:,} → {plan.target_bytes:,} bytes")
+    console.print("  [dim]Commands that will run:[/dim]")
+    for c in plan.commands:
+        console.print(f"    [green]$[/green] {c}")
+    for w in plan.warnings:
+        console.print(f"  [yellow]⚠️  {w}[/yellow]")
+
+    if not do_apply:
+        console.print("\n[dim]Preview only. Re-run with --apply to execute.[/dim]")
+        return
+
+    if mode == 'grow':
+        result = resizer.grow(partition, force=force)
+    elif mode == 'shrink':
+        result = resizer.shrink(partition, size, force=force)
+    else:
+        result = resizer.move(partition, start, force=force)
+
+    if result.refused:
+        console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+        sys.exit(1)
+    if result.error:
+        console.print(f"[red]{result.error}[/red]")
+        sys.exit(1)
+    console.print(f"[green]{mode} completed successfully.[/green]")
+
+
 @main.command()
 def list_algorithms():
     """List all available wiping algorithms."""

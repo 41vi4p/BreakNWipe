@@ -13,6 +13,15 @@ from .nvme import NVMeDevice
 from .filesystem import PartitionInfo, list_partitions, get_filesystem_type, get_mount_point
 from .health import DeviceHealth, get_device_health
 from .fsck import FilesystemChecker, FsckResult
+from .partition import (
+    DiskLayout,
+    ResizePlan,
+    ResizeResult,
+    PartitionResizer,
+    get_disk_layout,
+    list_logical_volumes,
+    extend_lv,
+)
 
 __all__ = [
     'DeviceDetector',
@@ -29,4 +38,11 @@ __all__ = [
     'get_device_health',
     'FilesystemChecker',
     'FsckResult',
+    'DiskLayout',
+    'ResizePlan',
+    'ResizeResult',
+    'PartitionResizer',
+    'get_disk_layout',
+    'list_logical_volumes',
+    'extend_lv',
 ]

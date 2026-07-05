@@ -4,6 +4,40 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.1.0] - 2026-07-06
+
+Phase 2 of the disk-toolkit roadmap: **partition management with full resize.**
+
+### Added
+- **Partition resize** — new isolated `breaknwipe/device/partition.py` (same safety discipline as
+  `fsck.py`), shelling out to `growpart`/`sfdisk`/`resize2fs`/`ntfsresize`/`xfs_growfs`/`btrfs`/
+  `pvresize`/`lvextend`:
+  - **Grow** a partition into adjacent free space and grow its filesystem — **live/online** for
+    ext4/XFS/Btrfs, which is what makes extending a root partition possible without a live USB. This
+    is the fix for the common "my VM/root disk grew but the partition didn't expand" case. LVM is
+    handled too (grow the PV, then `lvextend -r` the logical volume).
+  - **Shrink** (filesystem-first, then the partition table) — offline only; XFS is honestly reported
+    as un-shrinkable; refuses when mounted.
+  - **Move** (block-copy + partition-table rewrite) — experimental and gated hardest: offline only,
+    non-overlapping relocations only (an interrupted overlapping copy is unrecoverable), explicit
+    force + typed confirmation.
+  - Every operation is **preview-first**: the exact shell commands are computed and shown before
+    anything runs. Never auto-unmounts; system-disk operations require force.
+- **Disk-layout inspection** (`get_disk_layout`) — partitions + free-space gaps + GPT/MBR table type
+  + LVM detection, via `sfdisk --json` + `lsblk`.
+- **Web GUI**: an interactive proportional **partition map** on each device's page (partitions +
+  free space), with per-partition Extend/Shrink/Move actions that preview the exact commands and
+  require typed confirmation. New endpoints `GET /api/devices/{path}/partition-table`,
+  `POST /api/partition/resize` (dry-run plan + apply), `POST /api/lvm/extend`.
+- **CLI**: `breaknwipe resize <partition> --mode grow|shrink|move [--size|--start] [--apply] [--force]`
+  — previews by default, `--apply` to execute.
+- Packaging: `cloud-guest-utils`, `lvm2`, `xfsprogs`, `btrfs-progs`, `ntfs-3g` added to
+  `scripts/install_dependencies.sh` and the `.deb`/`.rpm` dependencies.
+- Verified end-to-end on disposable loopback disks (not just review): live grow of a mounted ext4
+  partition (~19MB→~103MB) with byte-identical file integrity; offline shrink (120→60MB) with
+  integrity; non-overlapping move to a new offset with integrity; and every safety refusal
+  (mounted-shrink, overlapping-move, over-size-shrink, whole-disk) firing correctly.
+
 ## [3.0.0] - 2026-07-06
 
 Repositioning release: BreakNWipe is now a **complete, approachable disk toolkit**, not just a

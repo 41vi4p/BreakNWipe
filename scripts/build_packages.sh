@@ -203,6 +203,12 @@ build_deb_package() {
         --depends "hdparm" \
         --depends "nvme-cli" \
         --depends "util-linux" \
+        --depends "parted" \
+        --depends "cloud-guest-utils" \
+        --depends "lvm2" \
+        --depends "xfsprogs" \
+        --depends "ntfs-3g" \
+        --depends "btrfs-progs" \
         --package "$deb_dir" \
         --after-install scripts/postinst \
         --before-remove scripts/prerm \
@@ -244,6 +250,12 @@ build_rpm_package() {
         --depends "hdparm" \
         --depends "nvme-cli" \
         --depends "util-linux" \
+        --depends "parted" \
+        --depends "cloud-guest-utils" \
+        --depends "lvm2" \
+        --depends "xfsprogs" \
+        --depends "ntfs-3g" \
+        --depends "btrfs-progs" \
         --package "$rpm_dir" \
         --after-install scripts/postinst \
         --before-remove scripts/prerm \

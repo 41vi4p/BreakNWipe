@@ -131,6 +131,82 @@ export interface ApiResponse {
   data?: Record<string, unknown> | null;
 }
 
+export interface DiskPartitionGeom {
+  node: string;
+  number: number;
+  start_sector: number;
+  size_sectors: number;
+  size_bytes: number;
+  fstype: string | null;
+  mount_point: string | null;
+  is_mounted: boolean;
+  is_system: boolean;
+  type_uuid: string | null;
+  name: string | null;
+  free_after_bytes: number;
+}
+
+export interface FreeSegment {
+  start_sector: number;
+  size_sectors: number;
+  size_bytes: number;
+}
+
+export interface LogicalVolume {
+  lv_name: string;
+  vg_name: string;
+  lv_path: string;
+  lv_size_bytes: string;
+  vg_free_bytes: string;
+}
+
+export interface DiskLayout {
+  disk: string;
+  table_type: string | null;
+  sector_size: number;
+  total_bytes: number;
+  partitions: DiskPartitionGeom[];
+  free_segments: FreeSegment[];
+  has_lvm: boolean;
+  error: string | null;
+  logical_volumes?: LogicalVolume[];
+}
+
+export interface ResizePlan {
+  partition: string;
+  mode: string;
+  fstype: string | null;
+  current_bytes: number;
+  target_bytes: number;
+  commands: string[];
+  warnings: string[];
+  refused: boolean;
+  refusal_reason: string | null;
+  requires_force: boolean;
+  experimental: boolean;
+}
+
+export interface ResizeResult {
+  partition: string;
+  mode: string;
+  success: boolean;
+  changes_made: boolean;
+  commands_run: string[];
+  output: string;
+  error: string | null;
+  refused: boolean;
+  refusal_reason: string | null;
+}
+
+export interface ResizeRequest {
+  partition: string;
+  mode: "grow" | "shrink" | "move";
+  target_bytes?: number | null;
+  new_start_sector?: number | null;
+  force?: boolean;
+  dry_run?: boolean;
+}
+
 // ---- Endpoints ----
 
 export const api = {
@@ -141,6 +217,12 @@ export const api = {
     request<Partition[]>(`/api/devices/${encodeURIComponent(path)}/partitions`),
   fsckCheck: (body: { partition: string; repair?: boolean; force?: boolean; filesystem?: string | null }) =>
     request<FsckResult>("/api/fsck/check", { method: "POST", body: JSON.stringify(body) }),
+  partitionTable: (path: string) =>
+    request<DiskLayout>(`/api/devices/${encodeURIComponent(path)}/partition-table`),
+  partitionResizePlan: (body: ResizeRequest) =>
+    request<ResizePlan>("/api/partition/resize", { method: "POST", body: JSON.stringify({ ...body, dry_run: true }) }),
+  partitionResizeApply: (body: ResizeRequest) =>
+    request<ResizeResult>("/api/partition/resize", { method: "POST", body: JSON.stringify({ ...body, dry_run: false }) }),
   wipeStart: (body: WipeStartRequest) =>
     request<ApiResponse>("/api/wipe/start", { method: "POST", body: JSON.stringify(body) }),
   wipeStatus: (sessionId: string) => request<Record<string, unknown>>(`/api/wipe/status/${sessionId}`),

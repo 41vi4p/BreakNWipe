@@ -113,6 +113,21 @@ class FsckCheckRequest(BaseModel):
     filesystem: Optional[str] = Field(default=None, description="Override auto-detected filesystem type")
 
 
+class PartitionResizeRequest(BaseModel):
+    """Request to plan (dry-run) or apply a partition resize."""
+    partition: str = Field(..., description="Partition to resize, e.g. /dev/sdb1")
+    mode: str = Field(..., description="One of: grow, shrink, move")
+    target_bytes: Optional[int] = Field(default=None, description="Target size in bytes (shrink); ignored for grow (fills free space)")
+    new_start_sector: Optional[int] = Field(default=None, description="New start sector (move)")
+    force: bool = Field(default=False, description="Confirm system-disk / experimental-move operations")
+    dry_run: bool = Field(default=True, description="Preview the exact commands without touching the disk")
+
+
+class LvExtendRequest(BaseModel):
+    """Request to extend an LVM logical volume (and its filesystem) to fill free VG space."""
+    lv_path: str = Field(..., description="Logical volume path, e.g. /dev/ubuntu-vg/ubuntu-lv")
+
+
 class WipeRequest(BaseModel):
     """Request to start a wipe operation."""
     device_path: str = Field(..., description="Target device path")

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { useAsync, useQueryParam } from "@/lib/hooks";
 import { Button, Card, CardHeader, DataValue, ErrorState, PageTitle, Spinner, Badge } from "@/components/ui";
 import { HealthPanel } from "@/components/health-panel";
-import { PartitionTable } from "@/components/partition-table";
+import { PartitionMap } from "@/components/partition-map";
 import { FsckPanel } from "@/components/fsck-panel";
 
 export default function DevicePage() {
@@ -15,6 +15,7 @@ export default function DevicePage() {
   const devices = useAsync(() => api.devices(), []);
   const health = useAsync(() => (path ? api.deviceHealth(path) : Promise.resolve(null)), [path]);
   const partitions = useAsync(() => (path ? api.devicePartitions(path) : Promise.resolve([])), [path]);
+  const layout = useAsync(() => (path ? api.partitionTable(path) : Promise.resolve(null)), [path]);
 
   if (!path) {
     return <ErrorState message="No device path given. Go back to Devices and open one." />;
@@ -74,15 +75,20 @@ export default function DevicePage() {
         <ErrorState message={`Health: ${health.error}`} />
       ) : null}
 
+      {layout.loading ? (
+        <Spinner label="Reading partition table…" />
+      ) : layout.data ? (
+        <PartitionMap layout={layout.data} onChanged={() => { layout.reload(); partitions.reload(); }} />
+      ) : layout.error ? (
+        <ErrorState message={`Partition table: ${layout.error}`} />
+      ) : null}
+
       {partitions.loading ? (
         <Spinner label="Listing partitions…" />
       ) : partitions.error ? (
         <ErrorState message={`Partitions: ${partitions.error}`} />
       ) : (
-        <>
-          <PartitionTable partitions={partitions.data ?? []} />
-          <FsckPanel partitions={partitions.data ?? []} />
-        </>
+        <FsckPanel partitions={partitions.data ?? []} />
       )}
     </div>
   );
