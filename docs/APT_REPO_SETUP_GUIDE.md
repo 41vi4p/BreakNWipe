@@ -167,7 +167,7 @@ Ubuntu or Debian machine (not your main dev machine, since this installs a packa
 
 ```bash
 curl -fsSL https://41vi4p.github.io/BreakNWipe/apt/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/breaknwipe.gpg
-echo "deb [signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
 sudo apt update
 sudo apt install breaknwipe
 breaknwipe --help

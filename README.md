@@ -27,7 +27,7 @@
 
 ```bash
 curl -fsSL https://41vi4p.github.io/BreakNWipe/apt/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/breaknwipe.gpg
-echo "deb [signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
 sudo apt update && sudo apt install breaknwipe
 ```
 
@@ -145,7 +145,7 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 
 ```bash
 curl -fsSL https://41vi4p.github.io/BreakNWipe/apt/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/breaknwipe.gpg
-echo "deb [signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/breaknwipe.gpg] https://41vi4p.github.io/BreakNWipe/apt stable main" | sudo tee /etc/apt/sources.list.d/breaknwipe.list
 sudo apt update
 sudo apt install breaknwipe
 ```
