@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.7.1-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -103,9 +103,9 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 - [x] Drive temperature monitoring during long wipes
 
 #### Disk Utility Toolkit
-- [x] **Drive health dashboard** — SMART status, temperature, power-on hours, and (where a reliable source exists — NVMe's standardized wear indicator or a recognized SATA SSD wear attribute) an estimated remaining-lifespan percentage; honestly reports "not available" rather than a guess for HDDs and unrecognized SSDs
-- [x] **Partition browsing** — filesystem type, size, and mount point per partition (`breaknwipe info <device>`)
-- [x] **Filesystem repair (fsck)** — `breaknwipe fsck <partition>` checks (and, with `--repair`, fixes) ext2/3/4, FAT/exFAT, NTFS, XFS, and Btrfs filesystems, with a safety model that never auto-unmounts and gates repairing system/Btrfs filesystems behind `--force`
+- [x] **Drive health dashboard** — SMART status, temperature, power-on hours, and (where a reliable source exists — NVMe's standardized wear indicator or a recognized SATA SSD wear attribute) an estimated remaining-lifespan percentage; honestly reports "not available" rather than a guess for HDDs and unrecognized SSDs. Available via `breaknwipe info <device>` and the web GUI's "Details / Health / Repair" page.
+- [x] **Partition browsing** — filesystem type, size, and mount point per partition, in both the CLI (`breaknwipe info <device>`) and the web GUI
+- [x] **Filesystem repair (fsck)** — checks (and, with `--repair`, fixes) ext2/3/4, FAT/exFAT, NTFS, XFS, and Btrfs filesystems, with a safety model that never auto-unmounts and gates repairing system/Btrfs filesystems behind `--force`. Available as `breaknwipe fsck <partition>` and from each device's web GUI details page.
 
 #### Certification & Verification
 - [x] **Digitally signed PDF certificates** (RSA / X.509)

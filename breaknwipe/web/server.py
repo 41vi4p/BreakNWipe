@@ -21,9 +21,14 @@ import uvicorn
 
 from .models import (
     ApiResponse, DeviceInfo, WipeRequest, WipeSession, WipeProgress,
-    WebSocketMessage, WipeSessionStatus
+    WebSocketMessage, WipeSessionStatus, PartitionModel, DeviceHealthModel,
+    FsckCheckRequest
 )
 from .session_manager import WipeSessionManager
+from ..device.filesystem import list_partitions
+from ..device.health import get_device_health
+from ..device.fsck import FilesystemChecker
+from ..device import DeviceDetector
 
 
 class WebServer:
@@ -120,6 +125,14 @@ class WebServer:
                 return HTMLResponse(content=frontend_path.read_text(), status_code=200)
             return HTMLResponse(content="<h1>Reports Page Not Found</h1>", status_code=404)
 
+        @self.app.get("/device-detail.html", response_class=HTMLResponse)
+        async def device_detail_page():
+            """Serve the device details/health/fsck page."""
+            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "device-detail.html"
+            if frontend_path.exists():
+                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
+            return HTMLResponse(content="<h1>Device Detail Page Not Found</h1>", status_code=404)
+
         @self.app.get("/about.html", response_class=HTMLResponse)
         async def about_page():
             """Serve the about page."""
@@ -167,6 +180,60 @@ class WebServer:
                 import traceback
                 error_detail = f"Device detection failed: {str(e)}\nTraceback: {traceback.format_exc()}"
                 raise HTTPException(status_code=500, detail=error_detail)
+
+        # Note: these three are defined as plain `def`, not `async def` --
+        # FastAPI/Starlette runs sync route handlers in a thread pool
+        # automatically, so the blocking subprocess calls inside
+        # get_device_health/list_partitions/FilesystemChecker.check() (which
+        # can take a while for a repair) don't block the event loop the way
+        # they would if awaited directly inside an async handler.
+
+        @self.app.get("/api/devices/{device_path:path}/health", response_model=DeviceHealthModel)
+        def get_device_health_endpoint(device_path: str):
+            """Get SMART health/lifespan snapshot for a device."""
+            device_path = "/" + device_path if not device_path.startswith("/") else device_path
+            try:
+                detector = DeviceDetector()
+                device = detector.get_device_info(device_path)
+                if not device:
+                    raise HTTPException(status_code=404, detail=f"Device not found: {device_path}")
+                health = get_device_health(device)
+                return DeviceHealthModel(**health.to_dict())
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Health lookup failed: {e}")
+
+        @self.app.get("/api/devices/{device_path:path}/partitions", response_model=List[PartitionModel])
+        def get_device_partitions_endpoint(device_path: str):
+            """List partitions/filesystems on a device."""
+            device_path = "/" + device_path if not device_path.startswith("/") else device_path
+            try:
+                partitions = list_partitions(device_path)
+                return [PartitionModel(**p.to_dict()) for p in partitions]
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Partition listing failed: {e}")
+
+        @self.app.post("/api/fsck/check")
+        def fsck_check_endpoint(request: FsckCheckRequest):
+            """
+            Check (or, with repair=True, repair) a filesystem. Safety gates
+            (never auto-unmounts, refuses --repair on a mounted partition,
+            requires force for system-disk/btrfs repair) live in
+            FilesystemChecker itself, so they apply here exactly as they do
+            for the CLI -- the web layer cannot bypass them by, say, omitting
+            a check the client is supposed to have already done.
+            """
+            try:
+                result = FilesystemChecker().check(
+                    request.partition,
+                    repair=request.repair,
+                    force=request.force,
+                    filesystem=request.filesystem,
+                )
+                return JSONResponse(content=result.to_dict())
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"fsck failed: {e}")
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):

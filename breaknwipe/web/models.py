@@ -5,7 +5,7 @@ Pydantic models for API request/response validation and WebSocket communication.
 """
 
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -73,6 +73,44 @@ class DeviceInfo(BaseModel):
     interface: str = Field(..., description="Device interface (SATA, NVMe, etc.)")
     is_mounted: bool = Field(..., description="Whether device is currently mounted")
     secure_erase_support: bool = Field(..., description="Hardware secure erase support")
+    mount_points: List[str] = Field(default_factory=list, description="Current mount points, if any")
+    is_system_disk: bool = Field(default=False, description="Whether this disk hosts the running system")
+
+
+class PartitionModel(BaseModel):
+    """A single partition and its filesystem, for the drive-health dashboard."""
+    path: str
+    parent_disk: str
+    size_bytes: int
+    size_human: str
+    fstype: Optional[str] = None
+    label: Optional[str] = None
+    uuid: Optional[str] = None
+    mount_point: Optional[str] = None
+    is_mounted: bool = False
+    is_system: bool = False
+    is_repairable_type: bool = False
+
+
+class DeviceHealthModel(BaseModel):
+    """SMART health/lifespan snapshot for a device, for the drive-health dashboard."""
+    smart_overall: Optional[str] = None
+    temperature_celsius: Optional[int] = None
+    power_on_hours: Optional[int] = None
+    power_cycles: Optional[int] = None
+    reallocated_sectors: Optional[int] = None
+    pending_sectors: Optional[int] = None
+    lifespan_remaining_percent: Optional[int] = None
+    lifespan_source: str = "not available"
+    warnings: List[str] = Field(default_factory=list)
+
+
+class FsckCheckRequest(BaseModel):
+    """Request to check (or, with repair=True, repair) a filesystem."""
+    partition: str = Field(..., description="Partition to check, e.g. /dev/sdb1 (not a whole disk)")
+    repair: bool = Field(default=False, description="Actually repair; default is check-only and never modifies anything")
+    force: bool = Field(default=False, description="Override the system-disk/btrfs repair safety gate (DANGEROUS)")
+    filesystem: Optional[str] = Field(default=None, description="Override auto-detected filesystem type")
 
 
 class WipeRequest(BaseModel):

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BreakNWipe by CodeBreakers - Device Details</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .nav-buttons { display: flex; gap: 10px; }
+        .nav-button {
+            background: linear-gradient(145deg, #2d3748, #1a202c);
+            border: 1px solid #4a5568;
+            color: #e2e8f0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .nav-button:hover {
+            background: linear-gradient(145deg, #4a5568, #2d3748);
+            border-color: #63b3ed;
+            color: #fff;
+        }
+        .detail-card {
+            background: linear-gradient(145deg, rgba(45, 55, 72, 0.8), rgba(26, 32, 44, 0.8));
+            border: 1px solid #4a5568;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .detail-card h3 { margin-top: 0; color: #63b3ed; }
+        .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(74,85,104,0.4); }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { color: #a0aec0; }
+        .detail-value { color: #e2e8f0; font-weight: 500; }
+        .warning-text { color: #f6ad55; }
+        .error-text { color: #fc8181; }
+        .success-text { color: #68d391; }
+        table.partitions-table { width: 100%; border-collapse: collapse; }
+        table.partitions-table th, table.partitions-table td {
+            text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(74,85,104,0.4); color: #e2e8f0;
+        }
+        table.partitions-table th { color: #a0aec0; font-weight: 600; }
+        select, input[type=text] {
+            background: #1a202c; color: #e2e8f0; border: 1px solid #4a5568;
+            border-radius: 6px; padding: 8px 12px; font-size: 14px;
+        }
+        .action-button {
+            background: linear-gradient(145deg, #2f855a, #276749);
+            border: none; color: white; padding: 10px 20px; border-radius: 8px;
+            cursor: pointer; font-weight: 600; margin-right: 10px;
+        }
+        .action-button.danger { background: linear-gradient(145deg, #c53030, #9b2c2c); }
+        .action-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .checkbox-row { margin: 10px 0; color: #e2e8f0; }
+        #fsckResult { margin-top: 15px; white-space: pre-wrap; font-family: monospace; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="page active">
+            <div class="header">
+                <div class="header-content">
+                    <div class="header-text">
+                        <h1>⚫ Device Details</h1>
+                        <p id="deviceTitle">Loading...</p>
+                    </div>
+                    <div class="nav-buttons">
+                        <a href="/index.html" class="nav-button">🏠 Devices</a>
+                        <a href="/logs.html" class="nav-button">📋 Logs</a>
+                        <a href="/about.html" class="nav-button">ℹ️ About</a>
+                    </div>
+                </div>
+            </div>
+            <div class="content">
+                <div id="loadError" class="detail-card" style="display:none;">
+                    <p class="error-text" id="loadErrorText"></p>
+                </div>
+
+                <div id="deviceInfoCard" class="detail-card" style="display:none;">
+                    <h3>Device Information</h3>
+                    <div id="deviceInfoBody"></div>
+                </div>
+
+                <div id="healthCard" class="detail-card" style="display:none;">
+                    <h3>Health</h3>
+                    <div id="healthBody"></div>
+                </div>
+
+                <div id="partitionsCard" class="detail-card" style="display:none;">
+                    <h3>Partitions</h3>
+                    <div id="partitionsBody"></div>
+                </div>
+
+                <div id="fsckCard" class="detail-card" style="display:none;">
+                    <h3>Filesystem Check / Repair</h3>
+                    <p style="color:#a0aec0; font-size: 14px;">
+                        Check-only never modifies anything and is the default. Repair is always
+                        refused on a mounted partition -- unmount it first, or, to repair your own
+                        system's root filesystem, boot from a separate live medium.
+                    </p>
+                    <div style="margin: 12px 0;">
+                        <label class="detail-label">Partition: </label>
+                        <select id="fsckPartitionSelect"></select>
+                    </div>
+                    <div class="checkbox-row">
+                        <label><input type="checkbox" id="fsckForceCheckbox"> Force (override system-disk/btrfs repair gate -- DANGEROUS)</label>
+                    </div>
+                    <button class="action-button" id="fsckCheckBtn" onclick="runFsck(false)">Check Only</button>
+                    <button class="action-button danger" id="fsckRepairBtn" onclick="confirmRepair()">Repair</button>
+                    <div id="fsckResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const devicePath = params.get('path');
+        let partitionsCache = [];
+
+        function apiPath(base) {
+            return base + encodeURIComponent(devicePath);
+        }
+
+        async function loadAll() {
+            if (!devicePath) {
+                showLoadError('No device path given. Go back to Devices and click "Details" on a device.');
+                return;
+            }
+            document.getElementById('deviceTitle').textContent = devicePath;
+
+            await Promise.all([loadDeviceInfo(), loadHealth(), loadPartitions()]);
+        }
+
+        function showLoadError(message) {
+            document.getElementById('loadError').style.display = 'block';
+            document.getElementById('loadErrorText').textContent = message;
+        }
+
+        async function loadDeviceInfo() {
+            try {
+                const response = await fetch('/api/devices');
+                if (!response.ok) throw new Error(await responseError(response));
+                const devices = await response.json();
+                const device = devices.find(d => d.path === devicePath);
+                if (!device) {
+                    showLoadError(`Device ${devicePath} not found in current device list.`);
+                    return;
+                }
+                const card = document.getElementById('deviceInfoCard');
+                const body = document.getElementById('deviceInfoBody');
+                body.innerHTML = [
+                    row('Model', device.model),
+                    row('Serial', device.serial),
+                    row('Capacity', device.capacity_human),
+                    row('Type', device.device_type),
+                    row('Interface', device.interface),
+                    row('Secure Erase Support', device.secure_erase_support ? 'Yes' : 'No'),
+                    row('System Disk', device.is_system_disk ? '<span class="warning-text">Yes</span>' : 'No'),
+                    row('Mounted', device.is_mounted ? 'Yes' : 'No'),
+                    row('Mount Points', (device.mount_points || []).join(', ') || '-'),
+                ].join('');
+                card.style.display = 'block';
+            } catch (error) {
+                showLoadError('Failed to load device info: ' + error.message);
+            }
+        }
+
+        async function loadHealth() {
+            try {
+                const response = await fetch(apiPath('/api/devices/') + '/health');
+                if (!response.ok) throw new Error(await responseError(response));
+                const health = await response.json();
+                const card = document.getElementById('healthCard');
+                const body = document.getElementById('healthBody');
+                const lifespanText = health.lifespan_remaining_percent !== null && health.lifespan_remaining_percent !== undefined
+                    ? `${health.lifespan_remaining_percent}% (${health.lifespan_source})`
+                    : `Not available (${health.lifespan_source})`;
+                body.innerHTML = [
+                    row('SMART Overall', health.smart_overall || 'Unknown'),
+                    row('Temperature', health.temperature_celsius !== null && health.temperature_celsius !== undefined ? health.temperature_celsius + '°C' : 'Unknown'),
+                    row('Power-On Hours', health.power_on_hours !== null && health.power_on_hours !== undefined ? health.power_on_hours : 'Unknown'),
+                    row('Estimated Life Remaining', lifespanText),
+                ].join('') + (health.warnings || []).map(w => `<p class="warning-text">⚠️ ${escapeHtml(w)}</p>`).join('');
+                card.style.display = 'block';
+            } catch (error) {
+                showLoadError('Failed to load health data: ' + error.message);
+            }
+        }
+
+        async function loadPartitions() {
+            try {
+                const response = await fetch(apiPath('/api/devices/') + '/partitions');
+                if (!response.ok) throw new Error(await responseError(response));
+                partitionsCache = await response.json();
+                const card = document.getElementById('partitionsCard');
+                const body = document.getElementById('partitionsBody');
+                const fsckCard = document.getElementById('fsckCard');
+                const select = document.getElementById('fsckPartitionSelect');
+
+                if (partitionsCache.length === 0) {
+                    body.innerHTML = '<p class="detail-label">No partitions detected.</p>';
+                } else {
+                    body.innerHTML = `
+                        <table class="partitions-table">
+                            <thead><tr><th>Path</th><th>Size</th><th>Filesystem</th><th>Mount Point</th></tr></thead>
+                            <tbody>
+                                ${partitionsCache.map(p => `
+                                    <tr>
+                                        <td>${escapeHtml(p.path)}</td>
+                                        <td>${escapeHtml(p.size_human)}</td>
+                                        <td>${escapeHtml(p.fstype || '-')}</td>
+                                        <td>${escapeHtml(p.mount_point || '-')}${p.is_system ? ' <span class="warning-text">⚠️ system</span>' : ''}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    select.innerHTML = partitionsCache.map(p =>
+                        `<option value="${escapeHtml(p.path)}">${escapeHtml(p.path)}${p.fstype ? ' (' + escapeHtml(p.fstype) + ')' : ''}</option>`
+                    ).join('');
+                    fsckCard.style.display = 'block';
+                }
+                card.style.display = 'block';
+            } catch (error) {
+                showLoadError('Failed to load partitions: ' + error.message);
+            }
+        }
+
+        function confirmRepair() {
+            const partition = document.getElementById('fsckPartitionSelect').value;
+            if (!confirm(`Repair ${partition}? This will modify the filesystem if problems are found. Make sure it is unmounted first.`)) {
+                return;
+            }
+            runFsck(true);
+        }
+
+        async function runFsck(repair) {
+            const partition = document.getElementById('fsckPartitionSelect').value;
+            const force = document.getElementById('fsckForceCheckbox').checked;
+            const resultDiv = document.getElementById('fsckResult');
+            const checkBtn = document.getElementById('fsckCheckBtn');
+            const repairBtn = document.getElementById('fsckRepairBtn');
+
+            if (!partition) {
+                resultDiv.innerHTML = '<p class="error-text">No partition selected.</p>';
+                return;
+            }
+
+            checkBtn.disabled = true;
+            repairBtn.disabled = true;
+            resultDiv.innerHTML = `<p class="detail-label">Running ${repair ? 'repair' : 'check'} on ${escapeHtml(partition)}...</p>`;
+
+            try {
+                const response = await fetch('/api/fsck/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ partition, repair, force }),
+                });
+                const result = await response.json();
+
+                if (result.refused) {
+                    resultDiv.innerHTML = `<p class="error-text">Refused: ${escapeHtml(result.refusal_reason)}</p>`;
+                } else {
+                    let html = `<p>Filesystem type: ${escapeHtml(result.fstype || 'unknown')} | Tool: ${escapeHtml(result.tool_used || 'none')}</p>`;
+                    for (const note of (result.notes || [])) {
+                        html += `<p class="warning-text">Note: ${escapeHtml(note)}</p>`;
+                    }
+                    if (result.error) {
+                        html += `<p class="error-text">${escapeHtml(result.error)}</p>`;
+                    } else if (result.changes_made) {
+                        html += `<p class="success-text">Filesystem errors were found and corrected.</p>`;
+                    } else if (result.filesystem_clean) {
+                        html += `<p class="success-text">Filesystem is clean.</p>`;
+                    }
+                    if (result.needs_reboot) {
+                        html += `<p class="warning-text">⚠️ A reboot is recommended to complete the repair.</p>`;
+                    }
+                    resultDiv.innerHTML = html;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error-text">Request failed: ${escapeHtml(error.message)}</p>`;
+            } finally {
+                checkBtn.disabled = false;
+                repairBtn.disabled = false;
+            }
+        }
+
+        function row(label, value) {
+            return `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>`;
+        }
+
+        async function responseError(response) {
+            try {
+                const data = await response.json();
+                return data.detail || response.statusText;
+            } catch (e) {
+                return response.statusText;
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str === null || str === undefined ? '' : String(str);
+            return div.innerHTML;
+        }
+
+        loadAll();
+    </script>
+</body>
+</html>

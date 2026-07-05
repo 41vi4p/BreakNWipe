@@ -4,6 +4,14 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.8.0] - 2026-07-05
+
+### Added
+- **Web GUI now surfaces the drive health dashboard and filesystem repair** (Phase 2 of the disk-utility toolkit, following the CLI-only Phase 1a/1b): a new "Details / Health / Repair" button on each device card opens `device-detail.html`, showing device info, SMART health/lifespan, a partitions table, and a check/repair panel for `fsck`.
+- New endpoints: `GET /api/devices/{path}/health`, `GET /api/devices/{path}/partitions`, `POST /api/fsck/check` — all defined as sync (not async) route handlers so FastAPI/Starlette runs their blocking `subprocess` calls in a thread pool rather than blocking the event loop. Every fsck safety gate (never auto-unmounts, refuses `--repair` on a mounted partition, requires `force` for system-disk/btrfs repair) applies identically to the web layer, since it calls the exact same `FilesystemChecker` the CLI uses — there is no separate, potentially-weaker path for the web UI.
+- `web/models.py`'s `DeviceInfo` widened to include `mount_points`/`is_system_disk`, fixing a pre-existing gap where `session_manager.py` silently dropped both fields even though `StorageDevice.to_dict()` already carried them.
+- Verified end-to-end against a live server (not just code review): started the real FastAPI server against a real loopback ext4 filesystem and confirmed `/api/devices`, `/device-detail.html`, the new health/partitions endpoints, and `/api/fsck/check` all work over real HTTP — including confirming `--repair` on a mounted partition is refused through the API exactly as it is through the CLI.
+
 ## [2.7.1] - 2026-07-05
 
 ### Added

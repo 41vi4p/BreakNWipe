@@ -607,6 +607,7 @@
                         <strong>Interface:</strong> ${device.interface || 'Unknown'}<br>
                         <strong>Status:</strong> <span style="color: ${statusColor}">${status}</span>
                     </div>
+                    <button type="button" class="nav-button device-details-button" style="margin-top: 10px; font-size: 12px; padding: 6px 12px;">ℹ️ Details / Health / Repair</button>
                 `;
 
                 deviceCard.addEventListener('click', () => {
@@ -619,6 +620,11 @@
                     deviceCard.classList.add('selected');
                     selectedDevice = device;
                     checkStartButton();
+                });
+
+                deviceCard.querySelector('.device-details-button').addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    window.location.href = '/device-detail.html?path=' + encodeURIComponent(device.path);
                 });
 
                 deviceGrid.appendChild(deviceCard);

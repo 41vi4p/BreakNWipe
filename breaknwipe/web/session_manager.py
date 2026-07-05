@@ -72,7 +72,9 @@ class WipeSessionManager:
                     device_type=device_type,
                     interface=getattr(device, 'interface', DeviceInterface.UNKNOWN).value if hasattr(getattr(device, 'interface', DeviceInterface.UNKNOWN), 'value') else str(getattr(device, 'interface', 'Unknown')),
                     is_mounted=device.is_mounted,
-                    secure_erase_support=getattr(device, 'secure_erase_support', False)
+                    secure_erase_support=getattr(device, 'secure_erase_support', False),
+                    mount_points=getattr(device, 'mount_points', None) or [],
+                    is_system_disk=getattr(device, 'is_system_disk', False)
                 )
                 device_list.append(device_info)
 
