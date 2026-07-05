@@ -14,11 +14,51 @@ against /proc/mounts instead.
 
 import json
 import logging
+import os
+import stat
 import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+class InvalidDevicePathError(ValueError):
+    """Raised when a caller-supplied path isn't a real block device.
+
+    Every function in this module that shells out to blkid/lsblk with a
+    caller-supplied path validates it first with validate_block_device_path().
+    subprocess.run() here is always called with a list (never shell=True), so
+    shell metacharacters (`;`, `|`, backticks) are never interpreted -- but an
+    unvalidated string could still (a) start with `-` and be misread as a flag
+    by the invoked tool (CWE-88 argument injection), or (b) just not exist,
+    producing a confusing tool error instead of a clear one. Requiring the
+    path to resolve to an actual, existing block device closes off both.
+    """
+
+
+def validate_block_device_path(path: str) -> str:
+    """
+    Validate that path is a real, existing block device (e.g. /dev/sda1) and
+    return it unchanged. Raises InvalidDevicePathError otherwise -- callers
+    should catch this and turn it into whatever refusal shape they use
+    (FsckResult, HTTPException, etc.), never let it surface as a raw
+    stack trace to an end user.
+    """
+    if not path or not path.startswith("/dev/") or ".." in path:
+        raise InvalidDevicePathError(
+            f"'{path}' is not a valid device path -- expected something like /dev/sda1."
+        )
+
+    try:
+        mode = os.stat(path, follow_symlinks=True).st_mode
+    except OSError as e:
+        raise InvalidDevicePathError(f"'{path}' does not exist or is not accessible: {e}")
+
+    if not stat.S_ISBLK(mode):
+        raise InvalidDevicePathError(f"'{path}' is not a block device.")
+
+    return path
 
 # Filesystem/partition "types" that aren't repairable filesystems in their own
 # right -- they're containers (encryption, volume management, RAID) whose
@@ -127,8 +167,15 @@ def get_filesystem_type(partition_path: str) -> Optional[str]:
     """
     Return the filesystem type of partition_path (e.g. "ext4", "ntfs",
     "vfat"), or None if it has no recognizable filesystem (e.g. it's an
-    unpartitioned whole disk, or blkid simply doesn't recognize it).
+    unpartitioned whole disk, or blkid simply doesn't recognize it) --
+    or if partition_path isn't a real block device at all.
     """
+    try:
+        validate_block_device_path(partition_path)
+    except InvalidDevicePathError as e:
+        logger.warning(str(e))
+        return None
+
     try:
         result = subprocess.run(
             ["blkid", "-o", "value", "-s", "TYPE", partition_path],
@@ -150,6 +197,12 @@ def list_partitions(device_path: str) -> List[PartitionInfo]:
     the whole device is returned.
     """
     partitions: List[PartitionInfo] = []
+
+    try:
+        validate_block_device_path(device_path)
+    except InvalidDevicePathError as e:
+        logger.warning(str(e))
+        return partitions
 
     try:
         result = subprocess.run(

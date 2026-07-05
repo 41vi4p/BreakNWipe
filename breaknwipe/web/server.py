@@ -6,6 +6,7 @@ Provides REST API endpoints and WebSocket support for the web GUI.
 
 import os
 import asyncio
+import logging
 import threading
 import webbrowser
 import time
@@ -18,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     ApiResponse, DeviceInfo, WipeRequest, WipeSession, WipeProgress,
@@ -202,7 +205,8 @@ class WebServer:
             except HTTPException:
                 raise
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Health lookup failed: {e}")
+                logger.exception(f"Health lookup failed for {device_path}")
+                raise HTTPException(status_code=500, detail="Health lookup failed. See server logs for details.")
 
         @self.app.get("/api/devices/{device_path:path}/partitions", response_model=List[PartitionModel])
         def get_device_partitions_endpoint(device_path: str):
@@ -212,7 +216,8 @@ class WebServer:
                 partitions = list_partitions(device_path)
                 return [PartitionModel(**p.to_dict()) for p in partitions]
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Partition listing failed: {e}")
+                logger.exception(f"Partition listing failed for {device_path}")
+                raise HTTPException(status_code=500, detail="Partition listing failed. See server logs for details.")
 
         @self.app.post("/api/fsck/check")
         def fsck_check_endpoint(request: FsckCheckRequest):
@@ -233,7 +238,8 @@ class WebServer:
                 )
                 return JSONResponse(content=result.to_dict())
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"fsck failed: {e}")
+                logger.exception(f"fsck failed for {request.partition}")
+                raise HTTPException(status_code=500, detail="fsck failed. See server logs for details.")
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):

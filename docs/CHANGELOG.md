@@ -4,6 +4,14 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.8.1] - 2026-07-05
+
+### Fixed
+- **CodeQL alert `py/command-line-injection` in `device/fsck.py`** (and the same pattern in `device/filesystem.py`'s `get_filesystem_type`/`list_partitions`): user-supplied partition/device paths (from the CLI argument or the web `/api/fsck/check` request body) now go through a new `validate_block_device_path()` check before being passed to `subprocess.run`. `subprocess.run` here was never called with `shell=True`, so shell-metacharacter injection (`;`, `|`, backticks) was never actually exploitable — but an unvalidated string starting with `-` could still be misread as a flag by the invoked tool (CWE-88 argument injection), and validation gives a much clearer refusal than a raw tool error either way. The new check requires the path to both look like a device path (`/dev/...`) and resolve to a real, existing block device (`os.stat` + `S_ISBLK`) — closing off the injection vector entirely, not just filtering characters. Verified with real malicious inputs (`--repair-force`, `/etc/passwd`, `; rm -rf / #`, `$(whoami)`, path traversal) against a live server and the CLI: all cleanly refused before any subprocess runs, with normal device paths unaffected.
+- **CodeQL alert `py/stack-trace-exposure` in the new web `/api/fsck/check`, `/api/devices/{path}/health`, and `/api/devices/{path}/partitions` endpoints**: unexpected errors no longer include the raw exception string in the HTTP response (`detail=f"...: {e}"`) — the real error is now logged server-side (`logger.exception(...)`) and the client gets a generic message instead.
+
+Five further pre-existing CodeQL alerts (command-line-injection in `device/detector.py`'s `_update_from_lsblk`/`_update_from_hdparm`/`_update_from_smartctl`/`_update_from_nvme`, predating this session's work) and three more (path-injection/stack-trace-exposure in the pre-existing `/api/download` and `/api/system-info` endpoints) were identified but intentionally left untouched pending a separate decision, since they sit in the wipe-critical device-detection path this project has otherwise been careful to keep isolated from newer, more experimental code.
+
 ## [2.8.0] - 2026-07-05
 
 ### Added

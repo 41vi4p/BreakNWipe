@@ -34,10 +34,12 @@ from typing import Any, Dict, List, Optional
 
 from .filesystem import (
     UNREPAIRABLE_FSTYPES,
+    InvalidDevicePathError,
     get_filesystem_type,
     get_mount_point,
     is_system_mount_point,
     list_partitions,
+    validate_block_device_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,6 +153,13 @@ class FilesystemChecker:
             something unsafe.
         """
         result = FsckResult(partition_path=partition_path, check_only=not repair)
+
+        try:
+            validate_block_device_path(partition_path)
+        except InvalidDevicePathError as e:
+            result.refused = True
+            result.refusal_reason = str(e)
+            return result
 
         fstype = filesystem or get_filesystem_type(partition_path)
         result.fstype = fstype
