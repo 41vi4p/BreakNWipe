@@ -4,13 +4,13 @@
 
 # BreakNWipe
 
-**A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
+**A complete, approachable disk toolkit — securely wipe drives with tamper-proof certificates, inspect health, manage partitions, and repair filesystems, all from one clean interface.**
 
-[![Version](https://img.shields.io/badge/version-2.8.2-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Web%20GUI-009688.svg?logo=fastapi&logoColor=white)](#%EF%B8%8F-user-interfaces)
+[![Next.js GUI](https://img.shields.io/badge/GUI-Next.js%20%2B%20FastAPI-000000.svg?logo=next.js&logoColor=white)](#%EF%B8%8F-user-interfaces)
 [![Solidity](https://img.shields.io/badge/Solidity-Sepolia%20Testnet-363636.svg?logo=solidity&logoColor=white)](#-blockchain-verification)
 [![NIST SP 800-88](https://img.shields.io/badge/NIST-SP%20800--88-orange.svg)](#-standards-compliance)
 [![SIH 2025](https://img.shields.io/badge/Smart%20India%20Hackathon-2025-FF6B35.svg)](#-about-the-project)
@@ -47,7 +47,13 @@ curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/unin
 
 ## 🏆 About the Project
 
-BreakNWipe was built for **Smart India Hackathon 2025** by **Team CodeBreakers!**
+BreakNWipe started as a secure-wipe utility for **Smart India Hackathon 2025** (Team CodeBreakers!)
+and is growing into a **complete, open-source disk toolkit** — the tool you reach for to wipe,
+inspect, repair, and (soon) resize and recover drives, without the confusion of existing tools.
+Secure wipe with tamper-proof, blockchain-anchored certificates remains its flagship. See
+[`docs/DISK_TOOLKIT_PLAN.md`](docs/DISK_TOOLKIT_PLAN.md) for the roadmap.
+
+**Origin — Smart India Hackathon 2025:**
 
 | | |
 |---|---|
@@ -118,7 +124,7 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 #### User Interfaces
 - [x] **Interactive CLI wizard** for beginners (`--interactive`)
 - [x] **Expert CLI mode** with full command-line control
-- [x] **Web GUI** — FastAPI + WebSocket interface with real-time progress, speed, and ETA (`--gui`)
+- [x] **Modern web GUI** — a Next.js + React interface (light & dark themes) served by the FastAPI backend, with real-time WebSocket progress; covers wipe, health, partitions, and filesystem repair (`--gui`)
 - [x] **Batch processing** of multiple devices from a config file
 - [x] `.deb` / `.rpm` package build scripts and system installer
 - [x] **Self-hosted APT repository** (GitHub Pages) — `sudo apt install breaknwipe` with real updates via `apt upgrade`
@@ -293,14 +299,15 @@ cp blockchain/.env.example blockchain/.env
 BreakNWipe/
 ├── breaknwipe/           # Python package
 │   ├── wipe_engine/      #   Core wiping algorithms, REA, verification
-│   ├── device/           #   Device detection, ATA/NVMe/mobile handlers
+│   ├── device/           #   Device detection, health, partitions, fsck, ATA/NVMe/mobile
 │   ├── certificate/      #   PDF/JSON certs, signatures, QR, blockchain
 │   ├── cli/              #   Interactive & expert CLI, progress display
 │   ├── web/              #   FastAPI server, WebSocket, session manager
+│   ├── breaknwipe-gui/   #   Next.js web GUI (built to a static bundle, served by web/)
 │   └── logging/          #   Audit-trail logging service & database
 ├── blockchain/           # Hardhat project — ReportRegistryWithJson contract
-├── frontend_ui/          # Web GUI static files (HTML/CSS)
-├── docs/                 # Design docs, integration guides, SIH presentation
+├── frontend_ui/          # Legacy static GUI (superseded by breaknwipe-gui; transitional fallback)
+├── docs/                 # Design docs, roadmap, integration guides, SIH presentation
 │   └── apt/pubkey.gpg    #   APT repo signing public key (see APT_REPO_SETUP_GUIDE.md)
 ├── scripts/              # Install, packaging, demo & setup scripts
 ├── tests/                # Integration test scripts
@@ -342,6 +349,18 @@ uv add <package>
 uv add --dev <package>
 ```
 
+For the web GUI (Next.js — lives in `breaknwipe/breaknwipe-gui/`):
+
+```bash
+cd breaknwipe/breaknwipe-gui
+npm install
+npm run dev     # live GUI on :3000 — run the backend too: sudo uv run python -m breaknwipe.cli.main --gui
+npm run build   # produce the static bundle (out/) that `--gui` serves in production
+```
+
+Node.js is only needed to build the GUI; it is **not** a runtime dependency. See
+[docs/DISK_TOOLKIT_PLAN.md](docs/DISK_TOOLKIT_PLAN.md) for the roadmap.
+
 For the smart contract:
 
 ```bash
@@ -350,7 +369,7 @@ pnpm install
 npx hardhat test
 ```
 
-Further reading: [docs/DESIGN.md](docs/DESIGN.md) · [docs/BLOCKCHAIN_INTEGRATION.md](docs/BLOCKCHAIN_INTEGRATION.md) · [docs/CHANGELOG.md](docs/CHANGELOG.md) · [SIH 2025 Presentation](docs/CodeBreakers_SIH25_PS1.pdf)
+Further reading: [docs/DISK_TOOLKIT_PLAN.md](docs/DISK_TOOLKIT_PLAN.md) · [docs/DESIGN.md](docs/DESIGN.md) · [docs/BLOCKCHAIN_INTEGRATION.md](docs/BLOCKCHAIN_INTEGRATION.md) · [docs/CHANGELOG.md](docs/CHANGELOG.md) · [SIH 2025 Presentation](docs/CodeBreakers_SIH25_PS1.pdf)
 
 ## 👥 Team CodeBreakers
 

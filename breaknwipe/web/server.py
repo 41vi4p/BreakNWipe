@@ -64,13 +64,31 @@ class WebServer:
             allow_headers=["*"],
         )
 
-        # Mount static files (frontend_ui)
-        frontend_path = Path(__file__).parent.parent.parent / "frontend_ui"
-        if frontend_path.exists():
-            self.app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
-
-        # Setup routes
+        # Register the REST + WebSocket routes first so they take precedence over
+        # the static-file mount below (Starlette matches routes in registration
+        # order; a mount at "/" would otherwise swallow /api and /ws requests).
         self._setup_routes()
+
+        # Serve the built Next.js GUI (a static export) as the site root. The GUI
+        # lives inside this package at breaknwipe/breaknwipe-gui/out and is built
+        # ahead of time (Node is a build-time-only dependency; see
+        # scripts/build_packages.sh). `html=True` serves index.html for directory
+        # requests and 404.html for misses. In dev the GUI runs separately on
+        # :3000, so this mount is only exercised in a built/installed deployment.
+        gui_out = Path(__file__).parent.parent / "breaknwipe-gui" / "out"
+        legacy_frontend = Path(__file__).parent.parent.parent / "frontend_ui"
+        if gui_out.exists():
+            self.app.mount("/", StaticFiles(directory=str(gui_out), html=True), name="gui")
+        elif legacy_frontend.exists():
+            # Transitional fallback if the GUI hasn't been built yet.
+            logger.warning(
+                "Built GUI not found at %s; falling back to legacy frontend_ui. "
+                "Build the GUI with `cd breaknwipe/breaknwipe-gui && npm ci && npm run build`.",
+                gui_out,
+            )
+            self.app.mount("/", StaticFiles(directory=str(legacy_frontend), html=True), name="gui")
+        else:
+            logger.error("No GUI found to serve (looked for %s and %s).", gui_out, legacy_frontend)
 
         # Add startup event to capture event loop
         @self.app.on_event("startup")
@@ -78,85 +96,8 @@ class WebServer:
             self.event_loop = asyncio.get_running_loop()
 
     def _setup_routes(self):
-        """Setup API routes."""
-
-        @self.app.get("/", response_class=HTMLResponse)
-        async def root():
-            """Serve the main interface."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "index.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>BreakNWipe Web Interface</h1><p>Frontend not found</p>")
-
-        @self.app.get("/index.html", response_class=HTMLResponse)
-        async def index_page():
-            """Serve the main interface via index.html."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "index.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>BreakNWipe Web Interface</h1><p>Frontend not found</p>")
-
-        @self.app.get("/progress.html", response_class=HTMLResponse)
-        async def progress_page():
-            """Serve the progress page."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "progress.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>Progress Page Not Found</h1>", status_code=404)
-
-        @self.app.get("/qr-report.html", response_class=HTMLResponse)
-        async def qr_report_page():
-            """Serve the QR report page."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "qr-report.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>Report Page Not Found</h1>", status_code=404)
-
-        @self.app.get("/logs.html", response_class=HTMLResponse)
-        async def logs_page():
-            """Serve the logs page."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "logs.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>Logs Page Not Found</h1>", status_code=404)
-
-        @self.app.get("/reports.html", response_class=HTMLResponse)
-        async def reports_page():
-            """Serve the reports page."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "reports.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>Reports Page Not Found</h1>", status_code=404)
-
-        @self.app.get("/device-detail.html", response_class=HTMLResponse)
-        async def device_detail_page():
-            """Serve the device details/health/fsck page."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "device-detail.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>Device Detail Page Not Found</h1>", status_code=404)
-
-        @self.app.get("/about.html", response_class=HTMLResponse)
-        async def about_page():
-            """Serve the about page."""
-            frontend_path = Path(__file__).parent.parent.parent / "frontend_ui" / "about.html"
-            if frontend_path.exists():
-                return HTMLResponse(content=frontend_path.read_text(), status_code=200)
-            return HTMLResponse(content="<h1>About Page Not Found</h1>", status_code=404)
-
-        @self.app.get("/favicon.ico")
-        async def favicon():
-            """Return a simple favicon or 404."""
-            # Check if a favicon exists in the frontend directory
-            favicon_path = Path(__file__).parent.parent.parent / "frontend_ui" / "favicon.ico"
-            if favicon_path.exists():
-                from fastapi.responses import FileResponse
-                return FileResponse(path=str(favicon_path), media_type="image/x-icon")
-
-            # Return a 1x1 transparent gif as a simple favicon
-            from fastapi.responses import Response
-            transparent_gif = b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x04\x01\x00\x3b'
-            return Response(content=transparent_gif, media_type="image/gif")
+        """Setup API routes. (The GUI itself is served as static files mounted at
+        "/" in _setup_app; these are the REST + WebSocket endpoints it calls.)"""
 
         @self.app.get("/api/devices", response_model=List[DeviceInfo])
         async def get_devices():

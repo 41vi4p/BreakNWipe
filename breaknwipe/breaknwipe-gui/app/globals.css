@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+/*
+  BreakNWipe design system — a calm, precise "control console" for disks.
+  Identity: neutral instrument surfaces, one confident emerald accent (a
+  modernized nod to the original brand green), strict semantic danger/warning/
+  success, and monospace for every piece of technical data (device paths, byte
+  sizes, sectors, hex). Full light + dark, driven by a `data-theme` attribute
+  with a `prefers-color-scheme` fallback (see the pre-paint script in layout.tsx).
+*/
+
+:root {
+  /* Light theme (default) */
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f6;
+  --surface-3: #e4e9f0;
+  --border: #dfe4ea;
+  --border-strong: #c6ced9;
+  --fg: #0d1520;
+  --fg-muted: #55627a;
+  --fg-subtle: #8a94a6;
+
+  --primary: #0f9d63;
+  --primary-hover: #0c8654;
+  --primary-fg: #ffffff;
+
+  --danger: #d63b3b;
+  --danger-hover: #bf2f2f;
+  --danger-fg: #ffffff;
+
+  --warning: #c47d10;
+  --success: #0f9d63;
+  --info: #2f74d0;
+
+  --ring: rgba(15, 157, 99, 0.45);
+  --shadow: 0 1px 2px rgba(13, 21, 32, 0.06), 0 8px 24px rgba(13, 21, 32, 0.06);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a0e15;
+  --surface: #111825;
+  --surface-2: #172232;
+  --surface-3: #1f2c40;
+  --border: #223047;
+  --border-strong: #34455f;
+  --fg: #e7edf5;
+  --fg-muted: #9aa7bd;
+  --fg-subtle: #64728a;
+
+  --primary: #1bb877;
+  --primary-hover: #24cd88;
+  --primary-fg: #06130c;
+
+  --danger: #f05555;
+  --danger-hover: #ff6b6b;
+  --danger-fg: #1a0808;
+
+  --warning: #eba30f;
+  --success: #1bb877;
+  --info: #5aa0f0;
+
+  --ring: rgba(27, 184, 119, 0.5);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* prefers-color-scheme fallback when the user hasn't explicitly chosen */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg: #0a0e15;
+    --surface: #111825;
+    --surface-2: #172232;
+    --surface-3: #1f2c40;
+    --border: #223047;
+    --border-strong: #34455f;
+    --fg: #e7edf5;
+    --fg-muted: #9aa7bd;
+    --fg-subtle: #64728a;
+    --primary: #1bb877;
+    --primary-hover: #24cd88;
+    --primary-fg: #06130c;
+    --danger: #f05555;
+    --danger-hover: #ff6b6b;
+    --danger-fg: #1a0808;
+    --warning: #eba30f;
+    --success: #1bb877;
+    --info: #5aa0f0;
+    --ring: rgba(27, 184, 119, 0.5);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Map the live theme variables into Tailwind's token system so utilities like
+   `bg-surface`, `text-fg-muted`, `border-border`, `bg-primary` follow the
+   active theme. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-fg: var(--danger-fg);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Technical data — device paths, sizes, sectors, hex — is always monospace. */
+.data {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+/* Console-style scrollbars */
+* {
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

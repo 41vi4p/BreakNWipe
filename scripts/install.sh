@@ -173,9 +173,31 @@ install_source() {
         --exclude='build' \
         --exclude='dist' \
         --exclude='node_modules' \
+        --exclude='.next' \
+        --exclude='out' \
         "$repo_root"/ "$INSTALL_DIR/src/"
 
     print_success "Source installed to $INSTALL_DIR/src"
+}
+
+build_gui() {
+    print_status "Building the web GUI (Next.js static export)..."
+
+    local gui_dir="$INSTALL_DIR/src/breaknwipe/breaknwipe-gui"
+    if ! command -v npm &> /dev/null; then
+        print_warning "npm not found — skipping GUI build. The web GUI (--gui) will be"
+        print_warning "unavailable until you install Node.js and rebuild. The CLI is unaffected."
+        return 0
+    fi
+
+    # Node is only needed to build; node_modules/.next are removed afterward so
+    # only the static bundle (out/) remains, served by the FastAPI backend.
+    if (cd "$gui_dir" && npm ci && npm run build); then
+        rm -rf "$gui_dir/node_modules" "$gui_dir/.next"
+        print_success "GUI built at $gui_dir/out"
+    else
+        print_warning "GUI build failed — the CLI still works; --gui will be unavailable."
+    fi
 }
 
 setup_venv() {
@@ -505,6 +527,7 @@ main() {
     create_user_group
     create_directories
     install_source
+    build_gui
     setup_venv
     create_wrapper_script
     create_config_files

@@ -72,9 +72,10 @@ check_dependencies() {
 
     # Check for required tools. Note: python3 itself is NOT required on the build
     # machine -- `uv sync` provisions its own managed Python inside the vendored
-    # venv, so the build toolchain only needs ruby/fpm (packaging) and uv (staging
-    # the venv) plus rsync/dpkg-dev for the mechanics.
-    required_tools=("ruby" "dpkg-deb" "fpm" "uv" "rsync")
+    # venv. Node/npm ARE required at build time to build the Next.js GUI into a
+    # static bundle (baked into the package; not needed at runtime). The rest is
+    # ruby/fpm (packaging) + uv (staging the venv) + rsync/dpkg-dev for mechanics.
+    required_tools=("ruby" "dpkg-deb" "fpm" "uv" "rsync" "node" "npm")
     missing_tools=()
 
     for tool in "${required_tools[@]}"; do
@@ -99,6 +100,13 @@ check_dependencies() {
             print_status "Installing uv..."
             curl -LsSf https://astral.sh/uv/install.sh | sh
             export PATH="$HOME/.local/bin:$PATH"
+        fi
+
+        # Node 20 (via NodeSource) -- distro nodejs is often too old for Next 16.
+        if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+            print_status "Installing Node.js 20 (build-time only, for the GUI)..."
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            apt install -y nodejs
         fi
     fi
 
@@ -130,11 +138,23 @@ prepare_build_environment() {
     mkdir -p /opt/breaknwipe/src
 
     print_status "Staging source + uv-managed virtual environment..."
+    # node_modules/.next/out are excluded from the source copy -- the GUI is
+    # rebuilt fresh below, and we don't want a stale/huge build carried over.
     rsync -a \
         --exclude='.git' --exclude='.venv' --exclude='venv' \
         --exclude='__pycache__' --exclude='*.egg-info' \
         --exclude='build' --exclude='dist' --exclude='node_modules' \
+        --exclude='.next' --exclude='out' \
         ./ /opt/breaknwipe/src/
+
+    # Build the Next.js GUI into a static bundle (breaknwipe-gui/out) that the
+    # FastAPI server serves at runtime. Node is only needed here at build time;
+    # node_modules and .next are stripped afterward so only `out/` ships in the
+    # package.
+    print_status "Building the GUI (Next.js static export)..."
+    local gui_dir="/opt/breaknwipe/src/breaknwipe/breaknwipe-gui"
+    (cd "$gui_dir" && npm ci && npm run build)
+    rm -rf "$gui_dir/node_modules" "$gui_dir/.next"
 
     # Force uv to download and use its own managed Python (--managed-python,
     # ignoring any build-machine system Python) so behavior is deterministic

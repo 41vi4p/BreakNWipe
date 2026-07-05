@@ -105,6 +105,30 @@ install_uv() {
     print_warning "Restart your shell (or run 'source ~/.bashrc') so 'uv' is on PATH"
 }
 
+# Node.js is only needed to build the web GUI (Next.js) into a static bundle.
+# It is not needed at runtime. Distro nodejs is often too old for Next 16, so
+# install Node 20 via NodeSource when a recent enough Node isn't already present.
+install_node() {
+    print_status "Checking for Node.js (needed only to build the web GUI)..."
+
+    if command -v node &> /dev/null; then
+        local major
+        major="$(node --version 2>/dev/null | sed 's/^v//; s/\..*//')"
+        if [[ -n "$major" && "$major" -ge 20 ]]; then
+            print_success "Node.js already installed: $(node --version)"
+            return 0
+        fi
+        print_warning "Node.js $(node --version) is too old for the GUI build; installing Node 20..."
+    fi
+
+    print_status "Installing Node.js 20 via NodeSource..."
+    if curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt install -y nodejs; then
+        print_success "Node.js installed: $(node --version 2>/dev/null)"
+    else
+        print_warning "Node.js install failed. The CLI works without it, but the web GUI (--gui) won't build."
+    fi
+}
+
 show_completion() {
     echo
     echo -e "${GREEN}================================================${NC}"
@@ -115,6 +139,7 @@ show_completion() {
     echo "  • smartmontools, hdparm, nvme-cli, util-linux, parted"
     echo "  • build-essential, libssl-dev, libffi-dev"
     echo "  • uv (Python package/dependency manager)"
+    echo "  • Node.js 20 (build-time only, for the web GUI)"
     echo
     echo -e "${BLUE}Next steps:${NC}"
     echo "  1. cd into the BreakNWipe project directory (if not already there)"
@@ -136,6 +161,7 @@ main() {
     check_system
     install_system_packages
     install_uv
+    install_node
     show_completion
 }
 

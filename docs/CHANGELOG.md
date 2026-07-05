@@ -4,6 +4,40 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.0.0] - 2026-07-06
+
+Repositioning release: BreakNWipe is now a **complete, approachable disk toolkit**, not just a
+secure-wipe utility — with a brand-new GUI. Secure wipe + tamper-proof certificates remain a
+flagship feature. The CLI and wipe engine are unchanged and fully compatible. This is Phase 1 of a
+larger roadmap (see `docs/DISK_TOOLKIT_PLAN.md`); partition resize, a sector/hex viewer, and file
+recovery follow in subsequent releases.
+
+### Added
+- **Brand-new web GUI** built with Next.js 16 / React 19 / Tailwind v4 / TypeScript, living at
+  `breaknwipe/breaknwipe-gui/` (a Node subproject inside the package). It replaces the old
+  hand-written static HTML pages with a professional, component-based interface featuring a real
+  design system, **light and dark themes** (a `data-theme` toggle with a `prefers-color-scheme`
+  fallback and a no-flash pre-paint script), and a consistent "control console" identity
+  (monospace for all technical data — device paths, sizes, sectors).
+- The GUI re-implements every existing feature (device list, drive health/lifespan, partitions,
+  filesystem check/repair, secure wipe with live WebSocket progress and certificate download, audit
+  log, certificates, about) against the unchanged backend API.
+
+### Changed
+- **Delivery model:** the GUI is built as a static export (`output: 'export'`) and served by the
+  existing FastAPI backend, so `sudo breaknwipe --gui` still launches a single server on a single
+  port. `web/server.py` now mounts the built bundle at `/` (`breaknwipe/breaknwipe-gui/out`,
+  located relative to the package) and its old per-page HTML routes were removed; `/api/*` and
+  `/ws/*` are unchanged. A transitional fallback to the legacy `frontend_ui/` remains if the GUI
+  hasn't been built.
+- **Packaging:** `scripts/build_packages.sh` and `scripts/install.sh` now build the GUI (`npm ci &&
+  npm run build`) before vendoring the source, then strip `node_modules`/`.next` so only the static
+  `out/` bundle ships. Node.js 20 is a **build-time-only** dependency (added to
+  `scripts/install_dependencies.sh` and the build container via NodeSource); runtime is still just
+  the Python venv. Verified end-to-end with a true cross-machine test: `.deb` built with the GUI in
+  one clean container, installed in a separate one, and confirmed the GUI is served (routes 200,
+  assets 200, `/api/*` still resolves under the mount, unknown paths 404).
+
 ## [2.8.2] - 2026-07-05
 
 ### Fixed
