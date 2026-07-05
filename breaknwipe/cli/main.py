@@ -37,6 +37,22 @@ except ImportError:
 
 console = Console()
 
+
+def complete_device_path(ctx, param, incomplete):
+    """Shell-completion callback: suggest real block device/partition paths.
+
+    Deliberately a plain glob rather than DeviceDetector.list_devices() --
+    that shells out to lsblk/hdparm/smartctl per device, which would make
+    every <Tab> press noticeably slow. A glob is instant and good enough for
+    completion purposes.
+    """
+    import glob
+    candidates = sorted(set(
+        glob.glob('/dev/sd*') + glob.glob('/dev/nvme[0-9]*') + glob.glob('/dev/mmcblk*')
+    ))
+    return [c for c in candidates if c.startswith(incomplete)]
+
+
 def check_root_privileges():
     """Check if running with root privileges."""
     if os.geteuid() != 0:
@@ -130,7 +146,8 @@ def main(ctx, version, interactive, gui, list_devices, verbose, host, port, brow
 
 
 @main.command()
-@click.option('--device', '-d', required=True, help='Target device (e.g., /dev/sda)')
+@click.option('--device', '-d', required=True, help='Target device (e.g., /dev/sda)',
+              shell_complete=complete_device_path)
 @click.option('--algorithm', '-a', default='nist-clear',
               type=click.Choice(['nist-clear', 'nist-purge', 'dod-3pass', 'dod-7pass',
                                'gutmann', 'random', 'zeros', 'custom']),
@@ -170,7 +187,7 @@ def batch(config, output, parallel):
     console.print("[yellow]Batch mode implementation in progress...[/yellow]")
 
 @main.command()
-@click.argument('device')
+@click.argument('device', shell_complete=complete_device_path)
 @click.option('--no-health', is_flag=True, help='Skip SMART health/lifespan lookup (faster)')
 @click.option('--no-partitions', is_flag=True, help='Skip partition/filesystem listing')
 def info(device, no_health, no_partitions):
@@ -232,7 +249,7 @@ def info(device, no_health, no_partitions):
 
 
 @main.command()
-@click.argument('partition')
+@click.argument('partition', shell_complete=complete_device_path)
 @click.option('--repair', is_flag=True, help='Actually repair (default: check-only, never modifies anything)')
 @click.option('--force', is_flag=True, help='Override the system-disk/btrfs repair safety gate (DANGEROUS)')
 @click.option('--filesystem', '-t', default=None, help='Override auto-detected filesystem type')
@@ -343,4 +360,10 @@ def verify_certificate(cert_file):
         console.print(f"[red]Certificate verification failed:[/red] {e}")
 
 if __name__ == '__main__':
-    main()
+    # Force a stable prog_name regardless of invocation method (console-script
+    # entry point vs. `python -m breaknwipe.cli.main` vs. the shell wrapper
+    # scripts/install.sh generates) -- otherwise Click derives it from
+    # sys.argv[0], which for `-m` invocation is the resolved module file path,
+    # breaking the `_BREAKNWIPE_COMPLETE=...` shell-completion env var (its
+    # name is derived from prog_name).
+    main(prog_name='breaknwipe')

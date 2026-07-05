@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.7.1-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -225,6 +225,25 @@ sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear --certificate
 sudo breaknwipe info /dev/sdX
 sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear --dry-run
 ```
+
+#### Shell Completion
+
+Tab-completion (subcommands, `--algorithm`/`--filesystem` choices, and real `/dev/sd*`/`/dev/nvme*` device paths) is generated dynamically from the CLI itself, so it's always in sync with the real commands. `sudo apt install breaknwipe` and `sudo make install-system`/`scripts/install.sh` set this up automatically if `bash-completion` is installed. If you installed via `uv sync`/`pip install`, or use zsh/fish, set it up manually once:
+
+```bash
+# bash
+_BREAKNWIPE_COMPLETE=bash_source breaknwipe > ~/.breaknwipe-complete.bash
+echo 'source ~/.breaknwipe-complete.bash' >> ~/.bashrc
+
+# zsh
+_BREAKNWIPE_COMPLETE=zsh_source breaknwipe > ~/.breaknwipe-complete.zsh
+echo 'source ~/.breaknwipe-complete.zsh' >> ~/.zshrc
+
+# fish
+_BREAKNWIPE_COMPLETE=fish_source breaknwipe > ~/.config/fish/completions/breaknwipe.fish
+```
+
+Restart your shell (or `source` the relevant rc file) afterward. To also complete the `bwipe` alias (bash only), add one more line after sourcing: `complete -o nosort -F _breaknwipe_completion bwipe`.
 
 ### Commands
 

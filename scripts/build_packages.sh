@@ -276,6 +276,20 @@ if command -v systemctl > /dev/null 2>&1; then
     systemctl enable breaknwipe-daemon || true
 fi
 
+# Shell completion, generated dynamically from the actual Click command tree
+# (cli/main.py pins prog_name='breaknwipe' so this works regardless of how
+# the vendored venv's python is invoked). /etc/bash_completion.d is
+# bash-completion's legacy "compat" drop-in dir -- still actively scanned if
+# bash-completion is installed, but not guaranteed to already exist.
+if [ -d /usr/share/bash-completion ]; then
+    mkdir -p /etc/bash_completion.d
+    if _BREAKNWIPE_COMPLETE=bash_source /opt/breaknwipe/src/.venv/bin/python -m breaknwipe.cli.main > /etc/bash_completion.d/breaknwipe 2>/dev/null; then
+        echo 'complete -o nosort -F _breaknwipe_completion bwipe 2>/dev/null || true' >> /etc/bash_completion.d/breaknwipe
+    else
+        rm -f /etc/bash_completion.d/breaknwipe
+    fi
+fi
+
 echo "BreakNWipe installation completed successfully"
 echo "Run 'sudo breaknwipe --interactive' to get started"
 EOF
@@ -318,6 +332,8 @@ case "$1" in
             rm -rf /var/lib/breaknwipe
             rm -rf /etc/breaknwipe
         fi
+
+        rm -f /etc/bash_completion.d/breaknwipe
         ;;
 esac
 

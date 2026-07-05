@@ -4,6 +4,16 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.7.1] - 2026-07-05
+
+### Added
+- **Shell tab-completion** for the CLI (bash/zsh/fish), generated dynamically from the actual Click command tree via Click's built-in shell-completion support — so it's never hand-maintained and can't drift out of sync with the real commands/options. A custom completer (`complete_device_path`) suggests real `/dev/sd*`/`/dev/nvme*` paths for `wipe --device`, `info <device>`, and `fsck <partition>`; everything else (subcommands, `--algorithm`/Choice options, `--output` paths) is completed automatically by Click. `sudo apt install breaknwipe` and `scripts/install.sh`/`make install-system` set this up automatically (when `bash-completion` is installed); manual bash/zsh/fish setup for `uv sync`/pip installs is documented in the README.
+- `cli/main.py`'s `main()` now pins `prog_name='breaknwipe'` explicitly — without it, Click derives the shell-completion env var name from `sys.argv[0]`, which for `python -m breaknwipe.cli.main` invocation is the resolved module file path, silently breaking `_BREAKNWIPE_COMPLETE` (confirmed: completion mode didn't activate at all before this fix, it just ran the CLI normally).
+
+### Fixed
+- `scripts/install.sh`'s bash-completion setup previously wrote unconditionally to `/etc/bash_completion.d/breaknwipe`, which would abort the *entire* install script (via `set -e`) on any system where that directory doesn't already exist (common on minimal installs — confirmed via testing) — now checks for the bash-completion infrastructure first and creates the directory as needed, matching how other Debian packages handle this legacy compat directory.
+- The old bash completion script (hand-maintained, static, install.sh-only) has been replaced — it was already stale (missing the new `fsck` command entirely) and only ever covered users who ran the full `install.sh` system installer. The `.deb` package's `postinst` now sets up completion too.
+
 ## [2.7.0] - 2026-07-05
 
 ### Added

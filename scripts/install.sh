@@ -370,42 +370,32 @@ EOF
 setup_bash_completion() {
     print_status "Setting up bash completion..."
 
-    # Create bash completion script
-    cat > /etc/bash_completion.d/breaknwipe << 'EOF'
-# BreakNWipe bash completion
+    # Generated dynamically from the actual Click command tree (via its
+    # built-in shell-completion support) rather than hand-maintained, so it
+    # can never drift out of sync with the real commands/options (it already
+    # knows about `fsck`, `--repair`, etc. for free). cli/main.py pins
+    # prog_name='breaknwipe' so the _BREAKNWIPE_COMPLETE env var below is
+    # honored regardless of how the venv's python is invoked.
+    local venv_python="$INSTALL_DIR/src/.venv/bin/python"
 
-_breaknwipe() {
-    local cur prev opts
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    # /etc/bash_completion.d is bash-completion's legacy "compat" drop-in dir
+    # -- still actively scanned if bash-completion is installed, but not
+    # guaranteed to already exist (it isn't auto-created by the package).
+    if [[ ! -d /usr/share/bash-completion ]]; then
+        print_warning "bash-completion not installed, skipping shell completion setup"
+        return 0
+    fi
+    mkdir -p /etc/bash_completion.d
 
-    opts="--help --version --interactive --list-devices --verbose wipe info list-algorithms batch verify-certificate"
-
-    case ${prev} in
-        --device|-d)
-            COMPREPLY=( $(compgen -W "$(ls /dev/sd* /dev/nvme* 2>/dev/null)" -- ${cur}) )
-            return 0
-            ;;
-        --algorithm|-a)
-            COMPREPLY=( $(compgen -W "nist-clear nist-purge dod-3pass dod-7pass gutmann random zeros custom" -- ${cur}) )
-            return 0
-            ;;
-        --output|-o)
-            COMPREPLY=( $(compgen -d -- ${cur}) )
-            return 0
-            ;;
-    esac
-
-    COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
-    return 0
-}
-
-complete -F _breaknwipe breaknwipe
-complete -F _breaknwipe bwipe
-EOF
-
-    print_success "Bash completion setup complete"
+    if _BREAKNWIPE_COMPLETE=bash_source "$venv_python" -m breaknwipe.cli.main > /etc/bash_completion.d/breaknwipe 2>/dev/null; then
+        # Click's generated script only registers the `breaknwipe` name;
+        # wire up the `bwipe` alias to the same completion function.
+        echo 'complete -o nosort -F _breaknwipe_completion bwipe 2>/dev/null || true' >> /etc/bash_completion.d/breaknwipe
+        print_success "Bash completion setup complete"
+    else
+        print_warning "Could not generate bash completion (non-fatal, breaknwipe still works)"
+        rm -f /etc/bash_completion.d/breaknwipe
+    fi
 }
 
 create_desktop_entry() {
