@@ -15,10 +15,13 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
 from .. import __version__
 from ..device import DeviceDetector, DeviceHandler
+from ..device.filesystem import list_partitions
+from ..device.health import get_device_health
 from ..wipe_engine import WipeEngine, AlgorithmType
 from ..certificate import CertificateGenerator
 from .interactive import InteractiveMode
@@ -168,7 +171,9 @@ def batch(config, output, parallel):
 
 @main.command()
 @click.argument('device')
-def info(device):
+@click.option('--no-health', is_flag=True, help='Skip SMART health/lifespan lookup (faster)')
+@click.option('--no-partitions', is_flag=True, help='Skip partition/filesystem listing')
+def info(device, no_health, no_partitions):
     """Display detailed information about a storage device."""
 
     try:
@@ -178,13 +183,97 @@ def info(device):
         console.print(f"[blue]Device Information:[/blue] {device}")
         console.print(f"Model: {device_info.model}")
         console.print(f"Serial: {device_info.serial}")
+        console.print(f"Vendor: {device_info.vendor or 'Unknown'}")
+        console.print(f"Firmware: {device_info.firmware_version or 'Unknown'}")
+        console.print(f"WWN: {device_info.wwn or 'Unknown'}")
         console.print(f"Capacity: {device_info.capacity_human}")
         console.print(f"Type: {device_info.device_type}")
         console.print(f"Interface: {device_info.interface}")
         console.print(f"Secure Erase Support: {'Yes' if device_info.secure_erase_support else 'No'}")
+        console.print(f"System Disk: {'Yes ⚠️' if device_info.is_system_disk else 'No'}")
+        console.print(f"Mounted: {'Yes' if device_info.is_mounted else 'No'}")
+        if device_info.mount_points:
+            console.print(f"Mount Points: {', '.join(device_info.mount_points)}")
+
+        if not no_health:
+            console.print()
+            console.print("[blue]Health:[/blue]")
+            health = get_device_health(device_info)
+            console.print(f"  SMART Overall: {health.smart_overall or 'Unknown'}")
+            console.print(f"  Temperature: {health.temperature_celsius}°C" if health.temperature_celsius else "  Temperature: Unknown")
+            console.print(f"  Power-On Hours: {health.power_on_hours}" if health.power_on_hours is not None else "  Power-On Hours: Unknown")
+            if health.lifespan_remaining_percent is not None:
+                console.print(f"  Estimated Life Remaining: {health.lifespan_remaining_percent}% ({health.lifespan_source})")
+            else:
+                console.print(f"  Estimated Life Remaining: Not available ({health.lifespan_source})")
+            for warning in health.warnings:
+                console.print(f"  [yellow]⚠️  {warning}[/yellow]")
+
+        if not no_partitions:
+            console.print()
+            partitions = list_partitions(device)
+            if partitions:
+                table = Table(title="Partitions")
+                table.add_column("Path")
+                table.add_column("Size")
+                table.add_column("Filesystem")
+                table.add_column("Mount Point")
+                for part in partitions:
+                    mount_display = part.mount_point or "-"
+                    if part.is_system:
+                        mount_display += " ⚠️ system"
+                    table.add_row(part.path, part.size_human, part.fstype or "-", mount_display)
+                console.print(table)
+            else:
+                console.print("[yellow]No partitions detected.[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error getting device information:[/red] {e}")
+
+
+@main.command()
+@click.argument('partition')
+@click.option('--repair', is_flag=True, help='Actually repair (default: check-only, never modifies anything)')
+@click.option('--force', is_flag=True, help='Override the system-disk/btrfs repair safety gate (DANGEROUS)')
+@click.option('--filesystem', '-t', default=None, help='Override auto-detected filesystem type')
+def fsck(partition, repair, force, filesystem):
+    """Check (and optionally repair) a filesystem's integrity.
+
+    Operates on a PARTITION (e.g. /dev/sdb1), not a whole disk. Check-only
+    mode is the default and never modifies anything; pass --repair to
+    actually fix problems. Repair is always refused on a mounted partition
+    (this tool never force-unmounts) -- unmount it yourself first, or, to
+    repair your own system's root filesystem, boot from a separate live
+    medium.
+    """
+    from ..device.fsck import FilesystemChecker
+
+    mode = "repair" if repair else "check-only"
+    console.print(f"[blue]Running fsck ({mode}) on:[/blue] {partition}")
+
+    result = FilesystemChecker().check(partition, repair=repair, force=force, filesystem=filesystem)
+
+    if result.refused:
+        console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+        sys.exit(1)
+
+    console.print(f"Filesystem type: {result.fstype}")
+    console.print(f"Tool used: {result.tool_used}")
+    for note in result.notes:
+        console.print(f"[yellow]Note:[/yellow] {note}")
+
+    if result.error:
+        console.print(f"[red]{result.error}[/red]")
+    elif result.changes_made:
+        console.print("[green]Filesystem errors were found and corrected.[/green]")
+    elif result.filesystem_clean:
+        console.print("[green]Filesystem is clean.[/green]")
+
+    if result.needs_reboot:
+        console.print("[yellow]⚠️  A reboot is recommended to complete the repair.[/yellow]")
+
+    if not result.success:
+        sys.exit(1)
 
 @main.command()
 def list_algorithms():

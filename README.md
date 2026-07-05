@@ -6,7 +6,7 @@
 
 **A one-click solution to *Break* the data through randomized encryption and *Wipe* it leaving no traces behind.**
 
-[![Version](https://img.shields.io/badge/version-2.6.2-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -101,6 +101,11 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 - [x] **Hidden area detection** — HPA (Host Protected Area) and DCO (Device Configuration Overlay) via `hdparm`
 - [x] Android device wiping via **ADB** (encrypts before factory reset — stronger than a plain factory reset)
 - [x] Drive temperature monitoring during long wipes
+
+#### Disk Utility Toolkit
+- [x] **Drive health dashboard** — SMART status, temperature, power-on hours, and (where a reliable source exists — NVMe's standardized wear indicator or a recognized SATA SSD wear attribute) an estimated remaining-lifespan percentage; honestly reports "not available" rather than a guess for HDDs and unrecognized SSDs
+- [x] **Partition browsing** — filesystem type, size, and mount point per partition (`breaknwipe info <device>`)
+- [x] **Filesystem repair (fsck)** — `breaknwipe fsck <partition>` checks (and, with `--repair`, fixes) ext2/3/4, FAT/exFAT, NTFS, XFS, and Btrfs filesystems, with a safety model that never auto-unmounts and gates repairing system/Btrfs filesystems behind `--force`
 
 #### Certification & Verification
 - [x] **Digitally signed PDF certificates** (RSA / X.509)
@@ -226,7 +231,8 @@ sudo breaknwipe wipe --device /dev/sdX --algorithm nist-clear --dry-run
 | Command | Description |
 |---------|-------------|
 | `wipe` | Perform secure data wiping |
-| `info <device>` | Display detailed device information |
+| `info <device>` | Display detailed device information, health, and partitions |
+| `fsck <partition>` | Check (and, with `--repair`, fix) a filesystem's integrity |
 | `list-algorithms` | Show available wiping algorithms |
 | `batch` | Batch processing from a JSON/YAML config file |
 | `verify-certificate` | Verify wipe certificate authenticity |

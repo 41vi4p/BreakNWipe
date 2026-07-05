@@ -4,6 +4,16 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [2.7.0] - 2026-07-05
+
+### Added
+- **Drive health & partition dashboard** (Phase 1a of a broader disk-utility toolkit, alongside secure wiping): `breaknwipe info <device>` now shows vendor/firmware/WWN, mount status, a health summary (SMART overall status, temperature, power-on hours, and — where a reliable source exists — an estimated remaining-lifespan percentage), and a partitions table (path, size, filesystem type, mount point). New modules `breaknwipe/device/filesystem.py` (partition listing, filesystem-type detection via `blkid`, exact mount-point detection via `/proc/mounts`) and `breaknwipe/device/health.py` (SMART/lifespan snapshot, reusing NVMe's existing `percentage_used` parsing and adding SATA/USB SMART wear-attribute parsing). Lifespan is deliberately only reported when a standardized/reliable source exists (NVMe's spec-mandated wear indicator, or a recognized SATA SSD wear attribute) — HDDs and unrecognized SSDs show raw health indicators instead of a fabricated number.
+- **Filesystem repair**: new `breaknwipe fsck <partition> [--repair] [--force] [--filesystem TYPE]` command. Check-only (no `--repair`) is the default and never modifies anything; dispatches to the right tool per filesystem type (`e2fsck`, `fsck.fat`, `fsck.exfat`, `ntfsfix`, `xfs_repair`, `btrfs check`). New `breaknwipe/device/fsck.py` implements the safety model: refuses on non-filesystem block types (swap/LUKS/LVM/RAID members) and whole disks with no filesystem; **never auto-unmounts** and refuses `--repair` outright on a mounted partition (unlike the wipe path, force-unmounting something you intend to keep risks corrupting in-flight writes); requires `--force` to repair a system-mounted-type partition or a btrfs filesystem (upstream discourages `btrfs check --repair` except when necessary); correctly interprets the standard fsck(8) exit-code bitmask (e.g. exit code 1 = "errors corrected" is a *success*, not a failure — a naive zero-check would misreport it).
+- Both features verified against real, disposable loopback filesystems (not just code review): confirmed correct filesystem-type/mount detection, confirmed `--repair` correctly refuses on a mounted filesystem, and confirmed the exit-code-bitmask interpretation against an intentionally-corrupted ext4 filesystem (check-only correctly reports the errors as uncorrected; `--repair` correctly fixes them and reports success despite a nonzero exit code).
+
+### Fixed
+- `breaknwipe/device/filesystem.py`'s partition listing now falls back to `blkid` when `lsblk`'s own `FSTYPE` column comes back empty (observed with standalone loop devices carrying a real filesystem) — the same robustness `get_filesystem_type()` already had.
+
 ## [2.6.2] - 2026-07-05
 
 ### Changed
