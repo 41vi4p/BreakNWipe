@@ -543,31 +543,44 @@ class WebServer:
                 import os
                 from fastapi.responses import FileResponse
 
-                # Security check - ensure file path is within allowed directories
-                if not os.path.exists(file_path) or not os.path.isfile(file_path):
+                # Resolve to a real, normalized absolute path *before* the
+                # allowlist check -- comparing the raw string let a traversal
+                # sequence (e.g. /home/../../etc/passwd) pass a naive
+                # startswith('/home') check while actually pointing outside
+                # every allowed directory.
+                resolved_path = os.path.realpath(file_path)
+
+                if not os.path.exists(resolved_path) or not os.path.isfile(resolved_path):
                     raise HTTPException(status_code=404, detail="File not found")
 
-                # Additional security: check if file is in a reports/certificates directory
+                # Additional security: check if file is in a reports/certificates directory.
+                # Compare against os.sep-anchored prefixes (or an exact match), not a bare
+                # startswith -- otherwise an allowed dir of "/home" would also match a
+                # sibling directory like "/homefoo".
                 allowed_dirs = [
-                    '/tmp',
-                    '/var/tmp',
-                    str(Path.home() / '.breaknwipe'),
-                    '/root/breaknwipe_reports',  # Certificate storage directory
-                    '/home',  # User home directories
-                    str(Path.cwd())  # Current working directory
+                    os.path.realpath('/tmp'),
+                    os.path.realpath('/var/tmp'),
+                    os.path.realpath(str(Path.home() / '.breaknwipe')),
+                    os.path.realpath('/root/breaknwipe_reports'),  # Certificate storage directory
+                    os.path.realpath('/home'),  # User home directories
+                    os.path.realpath(str(Path.cwd())),  # Current working directory
                 ]
-                if not any(file_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+                if not any(
+                    resolved_path == allowed_dir or resolved_path.startswith(allowed_dir + os.sep)
+                    for allowed_dir in allowed_dirs
+                ):
                     raise HTTPException(status_code=403, detail="Access denied")
 
                 return FileResponse(
-                    path=file_path,
-                    filename=os.path.basename(file_path),
+                    path=resolved_path,
+                    filename=os.path.basename(resolved_path),
                     media_type='application/octet-stream'
                 )
             except HTTPException:
                 raise
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+                logger.exception(f"Download failed for {file_path}")
+                raise HTTPException(status_code=500, detail="Download failed. See server logs for details.")
 
         @self.app.websocket("/ws/{session_id}")
         async def websocket_endpoint(websocket: WebSocket, session_id: str):
@@ -656,11 +669,12 @@ class WebServer:
                 return system_info
             except Exception as e:
                 # Fallback system info
+                logger.exception("Failed to gather system info")
                 return {
                     "Operating System": "Unknown",
                     "Python Version": "Unknown",
                     "Server Status": "Running",
-                    "Error": f"System info unavailable: {str(e)}"
+                    "Error": "System info unavailable. See server logs for details."
                 }
 
     async def _broadcast_progress(self, session_id: str, progress: WipeProgress):

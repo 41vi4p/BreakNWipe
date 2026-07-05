@@ -197,6 +197,10 @@ def info(device, no_health, no_partitions):
         detector = DeviceDetector()
         device_info = detector.get_device_info(device)
 
+        if not device_info:
+            console.print(f"[red]Error:[/red] '{device}' is not a valid, accessible block device.")
+            sys.exit(1)
+
         console.print(f"[blue]Device Information:[/blue] {device}")
         console.print(f"Model: {device_info.model}")
         console.print(f"Serial: {device_info.serial}")

@@ -46,11 +46,15 @@ class ExpertMode:
         # Validate device exists
         try:
             device_info = self.detector.get_device_info(device)
-            console.print(f"Device: {device_info.model} ({device_info.capacity_human})")
         except Exception as e:
             console.print(f"[red]Error accessing device {device}: {e}[/red]")
-            if not force:
-                return
+            return
+
+        if not device_info:
+            console.print(f"[red]Error:[/red] '{device}' is not a valid, accessible block device.")
+            return
+
+        console.print(f"Device: {device_info.model} ({device_info.capacity_human})")
 
         # Safety check
         if not force and not dry_run:

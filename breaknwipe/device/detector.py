@@ -13,6 +13,7 @@ from typing import List, Dict, Optional, Any
 from pathlib import Path
 
 from .storage import StorageDevice, DeviceType, DeviceInterface
+from .filesystem import validate_block_device_path
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,20 @@ class DeviceDetector:
         Returns:
             StorageDevice object or None
         """
+        # Single choke point for all the subprocess-shelling-out methods below
+        # (_update_from_lsblk/_update_from_hdparm/_update_from_smartctl/
+        # _update_from_nvme): require device_path to actually resolve to a
+        # real block device before it flows into any of their argv lists.
+        # None of those calls use shell=True, so shell-metacharacter injection
+        # was never exploitable, but an unvalidated string starting with `-`
+        # could still be misread as a flag by the invoked tool (CWE-88), and
+        # this also gives a much clearer error than a raw tool failure for a
+        # bogus path. list_devices() already only calls this with paths it
+        # verified exist under /sys/block, so this is a no-op for that path;
+        # it matters for get_device_info(), which takes a caller-supplied
+        # path directly (CLI arguments, web request paths).
+        validate_block_device_path(device_path)
+
         device_name = os.path.basename(device_path)
 
         # Get basic device information
