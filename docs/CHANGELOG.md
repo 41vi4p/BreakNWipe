@@ -7,12 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [3.7.0] - 2026-07-07
 
 ### Changed
-- **Algorithm picker in the Wipe flow is now cards, not a dropdown.** Each of the 13 algorithms
-  (8 standard + 5 REA crypto-erase) shows its pass count, a real description of what it actually
-  does (grounded in `wipe_engine/algorithms.py`'s real pass sequences, not just a marketing label),
-  and an "avoid on SSD/NVMe" note for the HDD-oriented ones (DoD 7-pass, Gutmann, REA Extreme).
-  Selection uses the same bordered-card + ring-glow highlight already used for the Recover/Verify
-  mode toggles, grouped under "Standard" and "REA (crypto-erase)" headings.
+- **Algorithm picker in the Wipe flow is now a two-step card flow, not a dropdown.** First pick a
+  category — Standard, REA (crypto-erase), or Custom — each with its own description of what that
+  family of algorithms actually does; picking one reveals only that category's algorithms as cards
+  (name, pass count, a real description grounded in `wipe_engine/algorithms.py`'s actual pass
+  sequences, and an "avoid on SSD/NVMe" note for the HDD-oriented ones: DoD 7-pass, Gutmann, REA
+  Extreme), instead of one long flat list mixing all 13 together. The three configurable algorithms
+  (Random, Custom pattern, REA Custom) moved into their own "Custom" category rather than being
+  buried inside Standard/REA. Switching category auto-selects that category's first algorithm, so
+  the wipe button never silently carries over a stale pick from a different category. Selection uses
+  the same bordered-card + ring-glow highlight already used for the Recover/Verify mode toggles.
 
 ## [3.6.1] - 2026-07-07
 

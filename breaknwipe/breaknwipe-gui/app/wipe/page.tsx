@@ -2,9 +2,22 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldAlert, Download, CheckCircle2, XCircle, Ban, Binary, Activity } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ShieldAlert,
+  Download,
+  CheckCircle2,
+  XCircle,
+  Ban,
+  Binary,
+  Activity,
+  ShieldCheck,
+  KeyRound,
+  SlidersHorizontal,
+} from "lucide-react";
 import { api, apiUrl, WIPE_TERMINAL, type DeviceInfo, type WipeProgressState } from "@/lib/api";
-import { ALGORITHMS, algorithmLabel } from "@/lib/algorithms";
+import { ALGORITHMS, CATEGORIES, algorithmLabel, algorithmGroup, type AlgorithmGroup } from "@/lib/algorithms";
 import { useAsync, useQueryParam } from "@/lib/hooks";
 import { useWebSocket } from "@/lib/use-websocket";
 import { formatBytes, formatDuration } from "@/lib/format";
@@ -13,6 +26,12 @@ import { ConfirmDialog } from "@/components/dialog";
 import { DevicePicker } from "@/components/device-picker";
 
 type WipeProgress = WipeProgressState;
+
+const CATEGORY_ICONS: Record<AlgorithmGroup, typeof ShieldCheck> = {
+  "Standard": ShieldCheck,
+  "REA (crypto-erase)": KeyRound,
+  "Custom": SlidersHorizontal,
+};
 
 export default function WipePage() {
   return (
@@ -30,6 +49,7 @@ function WipePageInner() {
   const activeWipes = (allSessions ?? []).filter((s) => !WIPE_TERMINAL.includes(s.progress.status));
 
   const [algorithm, setAlgorithm] = useState("nist-clear");
+  const [category, setCategory] = useState<AlgorithmGroup | null>(null);
   const [passes, setPasses] = useState(3);
   const [verify, setVerify] = useState(true);
   const [certificate, setCertificate] = useState(true);
@@ -62,7 +82,9 @@ function WipePageInner() {
         if (resume) {
           setSessionId(resume.session_id);
           setSeed(resume.progress);
-          setAlgorithm(resume.wipe_request?.algorithm ?? "nist-clear");
+          const resumedAlgorithm = resume.wipe_request?.algorithm ?? "nist-clear";
+          setAlgorithm(resumedAlgorithm);
+          setCategory(algorithmGroup(resumedAlgorithm) ?? null);
         }
       })
       .catch(() => {})
@@ -143,6 +165,15 @@ function WipePageInner() {
     setSessionId(null);
     setSeed(null);
     setStartError(null);
+    setCategory(null);
+  }
+
+  function chooseCategory(id: AlgorithmGroup) {
+    setCategory(id);
+    // Auto-select the category's first algorithm so "Wipe device" never
+    // silently uses a stale selection left over from a different category.
+    const first = ALGORITHMS.find((a) => a.group === id);
+    if (first) setAlgorithm(first.value);
   }
 
   const done = progress && WIPE_TERMINAL.includes(progress.status);
@@ -182,42 +213,71 @@ function WipePageInner() {
           <div className="space-y-5 p-5">
             <div>
               <label className="mb-2.5 block text-sm font-medium text-fg">Algorithm</label>
-              <div className="space-y-4">
-                {(["Standard", "REA (crypto-erase)"] as const).map((group) => (
-                  <div key={group}>
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-fg-subtle">{group}</div>
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      {ALGORITHMS.filter((a) => a.group === group).map((a) => {
-                        const active = algorithm === a.value;
-                        return (
-                          <button
-                            key={a.value}
-                            type="button"
-                            onClick={() => setAlgorithm(a.value)}
-                            className={`flex flex-col gap-1.5 rounded-lg border-2 p-3.5 text-left transition-colors ${
-                              active
-                                ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]"
-                                : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                              <span className="font-medium text-fg">{a.label}</span>
-                              <Badge tone={active ? "success" : "neutral"}>{a.passes}</Badge>
-                            </div>
-                            <p className="text-xs leading-relaxed text-fg-muted">{a.description}</p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                              {a.note && <span className="text-[11px] text-fg-subtle">{a.note}</span>}
-                              {!a.ssdSuitable && (
-                                <span className="text-[11px] text-warning">· designed for HDDs, avoid on SSD/NVMe</span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+
+              {!category ? (
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  {CATEGORIES.map((c) => {
+                    const Icon = CATEGORY_ICONS[c.id];
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => chooseCategory(c.id)}
+                        className="flex flex-col gap-2 rounded-lg border-2 border-border bg-surface-2 p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-3"
+                      >
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                          <Icon size={18} />
+                        </span>
+                        <span className="flex items-center gap-1.5 font-medium text-fg">
+                          {c.title}
+                          <ArrowRight size={14} className="text-fg-subtle" />
+                        </span>
+                        <p className="text-xs leading-relaxed text-fg-muted">{c.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setCategory(null)}
+                    className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-fg-muted hover:text-fg"
+                  >
+                    <ArrowLeft size={13} /> Change category
+                  </button>
+                  <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-fg-subtle">{category}</div>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {ALGORITHMS.filter((a) => a.group === category).map((a) => {
+                      const active = algorithm === a.value;
+                      return (
+                        <button
+                          key={a.value}
+                          type="button"
+                          onClick={() => setAlgorithm(a.value)}
+                          className={`flex flex-col gap-1.5 rounded-lg border-2 p-3.5 text-left transition-colors ${
+                            active
+                              ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]"
+                              : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <span className="font-medium text-fg">{a.label}</span>
+                            <Badge tone={active ? "success" : "neutral"}>{a.passes}</Badge>
+                          </div>
+                          <p className="text-xs leading-relaxed text-fg-muted">{a.description}</p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                            {a.note && <span className="text-[11px] text-fg-subtle">{a.note}</span>}
+                            {!a.ssdSuitable && (
+                              <span className="text-[11px] text-warning">· designed for HDDs, avoid on SSD/NVMe</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
 
             {configurable && (

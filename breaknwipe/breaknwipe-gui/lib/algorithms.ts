@@ -1,16 +1,46 @@
 // Wiping algorithms offered in the GUI, mirroring the backend's WipeAlgorithm
 // enum (breaknwipe/wipe_engine/algorithms.py) and its actual pass sequences.
 
+export type AlgorithmGroup = "Standard" | "REA (crypto-erase)" | "Custom";
+
 export interface AlgorithmOption {
   value: string;
   label: string;
   passes: string;
-  group: "Standard" | "REA (crypto-erase)";
+  group: AlgorithmGroup;
   note?: string;
   description: string;
   ssdSuitable: boolean;
   configurablePasses?: boolean;
 }
+
+export interface AlgorithmCategory {
+  id: AlgorithmGroup;
+  title: string;
+  description: string;
+}
+
+// Shown first, as the entry point into picking an algorithm -- narrows the
+// choice before the user sees any individual algorithm, instead of a single
+// flat list mixing named standards, BreakNWipe's own crypto-erase family, and
+// user-tunable options together.
+export const CATEGORIES: AlgorithmCategory[] = [
+  {
+    id: "Standard",
+    title: "Standard",
+    description: "Named, industry-recognized overwrite standards — NIST SP 800-88, DoD 5220.22-M, Gutmann, and simple zero/random fills. Pick this when you need a wipe method by a recognized name.",
+  },
+  {
+    id: "REA (crypto-erase)",
+    title: "REA (crypto-erase)",
+    description: "BreakNWipe's own Randomized Encryption Algorithm: encrypts the drive's data with rotating key material, then finishes with a real overwrite pass. A modern crypto-erase approach layered on top of standard overwriting.",
+  },
+  {
+    id: "Custom",
+    title: "Custom",
+    description: "Configure your own pass count, overwrite pattern, or REA encryption layers. For advanced users with a specific requirement the named standards don't cover.",
+  },
+];
 
 export const ALGORITHMS: AlgorithmOption[] = [
   {
@@ -59,15 +89,6 @@ export const ALGORITHMS: AlgorithmOption[] = [
     ssdSuitable: false,
   },
   {
-    value: "random",
-    label: "Random data",
-    passes: "configurable",
-    group: "Standard",
-    description: "One or more passes of cryptographically random data. Simple, high-entropy overwrite without following a named standard.",
-    ssdSuitable: true,
-    configurablePasses: true,
-  },
-  {
     value: "zeros",
     label: "Zero-fill",
     passes: "1 pass",
@@ -75,15 +96,6 @@ export const ALGORITHMS: AlgorithmOption[] = [
     note: "Quick sanitization",
     description: "A single pass of zero bytes. The fastest option — good for a quick wipe before internal reuse, not for media leaving your control.",
     ssdSuitable: true,
-  },
-  {
-    value: "custom",
-    label: "Custom pattern",
-    passes: "configurable",
-    group: "Standard",
-    description: "Define your own pass count and pattern. For advanced users with a specific compliance requirement this tool doesn't name directly.",
-    ssdSuitable: true,
-    configurablePasses: true,
   },
   {
     value: "rea-basic",
@@ -118,10 +130,28 @@ export const ALGORITHMS: AlgorithmOption[] = [
     ssdSuitable: false,
   },
   {
+    value: "random",
+    label: "Random data",
+    passes: "configurable",
+    group: "Custom",
+    description: "One or more passes of cryptographically random data. Simple, high-entropy overwrite without following a named standard.",
+    ssdSuitable: true,
+    configurablePasses: true,
+  },
+  {
+    value: "custom",
+    label: "Custom pattern",
+    passes: "configurable",
+    group: "Custom",
+    description: "Define your own pass count and pattern. For advanced users with a specific compliance requirement this tool doesn't name directly.",
+    ssdSuitable: true,
+    configurablePasses: true,
+  },
+  {
     value: "rea-custom",
     label: "REA Custom",
     passes: "configurable",
-    group: "REA (crypto-erase)",
+    group: "Custom",
     description: "Choose how many encryption layers to apply and which standard algorithm finishes the job (NIST Clear/Purge, DoD, random, or zero-fill).",
     ssdSuitable: true,
     configurablePasses: true,
@@ -130,4 +160,8 @@ export const ALGORITHMS: AlgorithmOption[] = [
 
 export function algorithmLabel(value: string): string {
   return ALGORITHMS.find((a) => a.value === value)?.label ?? value;
+}
+
+export function algorithmGroup(value: string): AlgorithmGroup | undefined {
+  return ALGORITHMS.find((a) => a.value === value)?.group;
 }
