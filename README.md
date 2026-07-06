@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="breaknwipe/breaknwipe-gui/public/breaknwipe_logo1.png" alt="BreakNWipe Logo" width="120"/>
+<img src="breaknwipe/breaknwipe-gui/public/breaknwipe_logo1.png" alt="BreakNWipe Logo" width="240" height="240"/>
 
 # BreakNWipe
 
@@ -383,8 +383,8 @@ Further reading: [docs/DISK_TOOLKIT_PLAN.md](docs/DISK_TOOLKIT_PLAN.md) · [docs
 | Member | Contribution |
 |--------|-------------|
 | **Blaise Rodrigues** (Team Lead) | Algorithms, Testing & Architecture Design |
-| **David Porathur** | CLI Utility, Features Integration & Architecture Design |
-| **Vanessa Rodrigues** | Next.js App, Research & Architecture Design |
+| **David Porathur** | CLI Utility, Github Workflows, Next.js GUI, Features Integration & Architecture Design |
+| **Vanessa Rodrigues** | Research & Architecture Design |
 | **Natasha Lewis** | UI & Research |
 | **Chris Lopes** | Next.js App with digital signature verification |
 | **Anastasia Lopes** | UI, Frontend & Research |
