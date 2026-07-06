@@ -4,6 +4,25 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.7.2] - 2026-07-07
+
+### Changed
+- **Logo shown large where it needs detail to read.** The landing-page hero now has a two-column
+  layout — headline/copy/pillars on the left, the logo large (up to 256px) on the right with a
+  gentle continuous float and a soft brand-tinted drop shadow — and the About page's project badge
+  grew from a 44px icon-sized crop to a 144px image alongside the title/description. At the small
+  sizes used before, the logo's badge details (shield, disk, lightning bolt, wraparound text)
+  weren't legible; the top-bar/favicon uses stay small since those are just recognition marks, not
+  meant to be read in detail.
+
+## [3.7.1] - 2026-07-07
+
+### Changed
+- **New logo** (`breaknwipe/breaknwipe-gui/public/breaknwipe_logo1.png`) — replaces the placeholder
+  shield icon in the GUI's top-bar brand mark and the About page's project badge, generated into a
+  proper multi-resolution (16/32/48/64px) `favicon.ico`, and now the image the README displays.
+  Retired the old `frontend_ui/images/logo.png` reference.
+
 ## [3.7.0] - 2026-07-07
 
 ### Changed

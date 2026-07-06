@@ -77,7 +77,7 @@ committed into the live-build config tree.
 - **Certificate persistence (v1 requirement):** the launcher (or a wrapper around the `breaknwipe wipe`/`--interactive` invocation) must point the certificate output directory at somewhere that survives reboot — either a small FAT32/ext4 **persistence partition on the boot USB itself** (label `breaknwipe-certs`, auto-mounted by the launcher before invoking BreakNWipe, e.g. via `--output-dir` if the CLI supports it, or by symlinking `~/breaknwipe_reports` to the mounted partition), or a documented fallback of auto-detecting and copying to any *other* attached USB drive. Pick the boot-USB persistence-partition approach for v1 — it needs no second device and matches how DBAN-style tools handle logs.
 
 ### 5. Branding — concrete, deliberately lightweight for a console appliance
-- **Bootloader menu:** live-build `config/bootloaders/grub-pc/grub.cfg` with custom entries ("BreakNWipe — Wipe this machine", "BreakNWipe — Network GUI mode", "Boot from first hard disk"), background image converted from the existing `frontend_ui/images/logo.png`.
+- **Bootloader menu:** live-build `config/bootloaders/grub-pc/grub.cfg` with custom entries ("BreakNWipe — Wipe this machine", "BreakNWipe — Network GUI mode", "Boot from first hard disk"), background image converted from the existing `breaknwipe/breaknwipe-gui/public/breaknwipe_logo1.png`.
 - **Plymouth splash: skip for v1.** A console-only appliance doesn't need graphical boot theming; a quiet/verbose text boot is fine. This is v2 polish.
 - **os-release / MOTD / issue:** ship `config/includes.chroot/etc/os-release` (`NAME="BreakNWipe Live"`, `PRETTY_NAME="BreakNWipe Live <version> (Ubuntu 24.04)"`), `/etc/motd`, `/etc/issue` with an ASCII banner. Cheap, high-signal branding.
 - **Terminal colors:** nothing to do — the CLI already uses Rich, which auto-detects the Linux console's color support and degrades gracefully; just ensure `TERM` is set correctly by the getty override.
@@ -93,7 +93,7 @@ live-build/
   config/includes.chroot/usr/local/sbin/breaknwipe-live-launcher
   config/includes.chroot/root/.bash_profile
   config/includes.chroot/etc/{os-release,motd,issue}
-  config/bootloaders/grub-pc/                           # grub.cfg + splash.png (derived from frontend_ui/images/logo.png)
+  config/bootloaders/grub-pc/                           # grub.cfg + splash.png (derived from breaknwipe/breaknwipe-gui/public/breaknwipe_logo1.png)
 scripts/build_live_iso.sh                                # driver script, matching existing scripts/ bash style (set -e, print_status/etc, main() with phase functions)
 ```
 

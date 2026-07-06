@@ -225,3 +225,21 @@ body {
 .hero-in {
   animation: hero-fade-up 0.6s ease-out both;
 }
+
+/* Gentle continuous float for the hero logo. Combined with .hero-in (the
+   one-shot entrance fade), both animations need listing together -- the
+   `animation` shorthand on one class would otherwise clobber the other's. */
+@keyframes hero-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.hero-float {
+  animation: hero-float 6s ease-in-out infinite;
+}
+.hero-in.hero-float {
+  animation: hero-fade-up 0.6s ease-out both, hero-float 6s ease-in-out 0.6s infinite;
+}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Trash2, FileSearch, ShieldCheck, HardDrive, ScrollText, FileCheck2, Info, Shield } from "lucide-react";
+import { Trash2, FileSearch, ShieldCheck, HardDrive, ScrollText, FileCheck2, Info } from "lucide-react";
 import { ThemeToggle } from "./theme";
 
 type Tint = "danger" | "info" | "success" | "primary";
@@ -44,9 +44,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3">
             <Link href="/" className="flex shrink-0 items-center gap-2.5">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-fg">
-                <Shield size={17} />
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- static-export SPA, no image optimizer to benefit from next/image */}
+              <img src="/breaknwipe_logo1.png" alt="" className="h-8 w-8 rounded-lg" />
               <span className="hidden font-semibold tracking-tight text-fg sm:inline">BreakNWipe</span>
             </Link>
 

@@ -33,10 +33,13 @@ export default function AboutPage() {
       <PageTitle title="About" />
 
       <Card className="p-6">
-        <div className="flex items-start gap-4">
-          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-fg">
-            <ShieldCheck size={22} />
-          </span>
+        <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-start sm:text-left">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static-export SPA, no image optimizer to benefit from next/image */}
+          <img
+            src="/breaknwipe_logo1.png"
+            alt=""
+            className="h-32 w-32 shrink-0 rounded-2xl drop-shadow-[0_8px_24px_rgba(15,157,99,0.2)] sm:h-36 sm:w-36"
+          />
           <div>
             <div className="text-xl font-semibold tracking-tight">BreakNWipe</div>
             <div className="text-[11px] uppercase tracking-[0.14em] text-fg-subtle">Complete Disk Toolkit</div>

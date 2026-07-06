@@ -62,31 +62,42 @@ export default function HomePage() {
       <HeroTexture />
 
       <div className="relative mx-auto max-w-5xl px-5 pb-16 pt-16 sm:pt-24">
-        <div className="max-w-2xl">
-          <h1 className="hero-in text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
-            Know exactly what happened to your data.
-          </h1>
-          <p className="hero-in mt-4 text-lg leading-relaxed text-fg-muted" style={{ animationDelay: "80ms" }}>
-            BreakNWipe is a complete, open-source disk toolkit: securely erase drives with tamper-proof
-            certificates, recover what was accidentally deleted, verify a drive was actually wiped clean,
-            and manage disks — without the confusion of traditional tools.
-          </p>
+        <div className="flex flex-col items-center gap-10 lg:flex-row lg:justify-between">
+          <div className="max-w-2xl">
+            <h1 className="hero-in text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
+              Know exactly what happened to your data.
+            </h1>
+            <p className="hero-in mt-4 text-lg leading-relaxed text-fg-muted" style={{ animationDelay: "80ms" }}>
+              BreakNWipe is a complete, open-source disk toolkit: securely erase drives with tamper-proof
+              certificates, recover what was accidentally deleted, verify a drive was actually wiped clean,
+              and manage disks — without the confusion of traditional tools.
+            </p>
 
-          {devices && (
-            <Link
-              href="/utility/"
-              className="hero-in mt-6 inline-flex items-center gap-2 text-sm text-fg-muted transition-colors hover:text-fg"
-              style={{ animationDelay: "160ms" }}
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              <DataValue className="text-fg">{devices.length}</DataValue> storage device
-              {devices.length === 1 ? "" : "s"} detected on this machine
-              <ArrowRight size={14} />
-            </Link>
-          )}
+            {devices && (
+              <Link
+                href="/utility/"
+                className="hero-in mt-6 inline-flex items-center gap-2 text-sm text-fg-muted transition-colors hover:text-fg"
+                style={{ animationDelay: "160ms" }}
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
+                <DataValue className="text-fg">{devices.length}</DataValue> storage device
+                {devices.length === 1 ? "" : "s"} detected on this machine
+                <ArrowRight size={14} />
+              </Link>
+            )}
+          </div>
+
+          <div className="hero-in hero-float shrink-0" style={{ animationDelay: "40ms" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- static-export SPA, no image optimizer to benefit from next/image */}
+            <img
+              src="/breaknwipe_logo1.png"
+              alt="BreakNWipe"
+              className="h-48 w-48 drop-shadow-[0_12px_32px_rgba(15,157,99,0.25)] sm:h-56 sm:w-56 lg:h-64 lg:w-64"
+            />
+          </div>
         </div>
 
         <div className="mt-12 grid grid-cols-1 gap-3 sm:grid-cols-2">
