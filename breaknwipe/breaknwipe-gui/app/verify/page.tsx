@@ -94,8 +94,10 @@ function VerifyPageInner() {
                 key={d.value}
                 type="button"
                 onClick={() => setDepth(d.value)}
-                className={`flex-1 rounded-lg border p-3 text-left transition-colors ${
-                  depth === d.value ? "border-primary bg-primary/8" : "border-border bg-surface-2 hover:bg-surface-3"
+                className={`flex-1 rounded-lg border-2 p-3 text-left transition-colors ${
+                  depth === d.value
+                    ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]"
+                    : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
                 }`}
               >
                 <div className="text-sm font-medium text-fg">{d.label}</div>

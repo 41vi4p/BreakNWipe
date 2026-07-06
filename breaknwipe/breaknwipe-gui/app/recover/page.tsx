@@ -505,8 +505,8 @@ function ModeCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex-1 rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        active ? "border-primary bg-primary/8" : "border-border bg-surface-2 hover:bg-surface-3"
+      className={`flex-1 rounded-lg border-2 p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+        active ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]" : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
       }`}
     >
       <div className="text-sm font-medium text-fg">{title}</div>
