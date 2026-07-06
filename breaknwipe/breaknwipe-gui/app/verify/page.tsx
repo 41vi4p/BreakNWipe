@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Ban,
   CheckCircle2,
   FileWarning,
   Gauge,
@@ -12,9 +13,27 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { api, type DeviceInfo, type ErasureCheckResult } from "@/lib/api";
+import {
+  api,
+  VERIFY_JOB_TERMINAL,
+  type DeviceInfo,
+  type ErasureCheckResult,
+  type VerifyJobProgress,
+} from "@/lib/api";
 import { useAsync, useQueryParam } from "@/lib/hooks";
-import { Badge, Button, Card, CardHeader, DataValue, ErrorState, PageTitle, Spinner } from "@/components/ui";
+import { useWebSocket } from "@/lib/use-websocket";
+import { formatDuration } from "@/lib/format";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  DataValue,
+  ErrorState,
+  PageTitle,
+  ProgressBar,
+  Spinner,
+} from "@/components/ui";
 import { DevicePicker } from "@/components/device-picker";
 
 type Depth = "quick" | "comprehensive" | "paranoid";
@@ -40,8 +59,12 @@ function VerifyPageInner() {
 
   const [depth, setDepth] = useState<Depth>("comprehensive");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<ErasureCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  const { last } = useWebSocket<{ type: string; data: VerifyJobProgress }>(jobId ? `/ws/verify/${jobId}` : null);
+  const job = last?.data ?? null;
+  const done = job ? VERIFY_JOB_TERMINAL.includes(job.status) : false;
 
   if (!path) {
     return (
@@ -59,15 +82,28 @@ function VerifyPageInner() {
     if (!path) return;
     setBusy(true);
     setError(null);
-    setResult(null);
     try {
-      const r = await api.verifyErasure({ device: path, depth });
-      setResult(r);
+      const { job_id } = await api.verifyErasureStart({ device: path, depth });
+      setJobId(job_id);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function cancel() {
+    if (!jobId) return;
+    try {
+      await api.verifyErasureCancel(jobId);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  function newCheck() {
+    setJobId(null);
+    setError(null);
   }
 
   return (
@@ -85,35 +121,90 @@ function VerifyPageInner() {
         </DataValue>
       </div>
 
-      <Card>
-        <CardHeader title="Check depth" icon={<Gauge size={16} />} />
-        <div className="space-y-4 p-5">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {DEPTHS.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => setDepth(d.value)}
-                className={`flex-1 rounded-lg border-2 p-3 text-left transition-colors ${
-                  depth === d.value
-                    ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]"
-                    : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
-                }`}
-              >
-                <div className="text-sm font-medium text-fg">{d.label}</div>
-                <div className="mt-1 text-xs text-fg-muted">{d.desc}</div>
-              </button>
-            ))}
+      {!jobId && (
+        <Card>
+          <CardHeader title="Check depth" icon={<Gauge size={16} />} />
+          <div className="space-y-4 p-5">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {DEPTHS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  onClick={() => setDepth(d.value)}
+                  className={`flex-1 rounded-lg border-2 p-3 text-left transition-colors ${
+                    depth === d.value
+                      ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]"
+                      : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
+                  }`}
+                >
+                  <div className="text-sm font-medium text-fg">{d.label}</div>
+                  <div className="mt-1 text-xs text-fg-muted">{d.desc}</div>
+                </button>
+              ))}
+            </div>
+            <Button onClick={run} loading={busy}>
+              <ShieldCheck size={15} /> Run check
+            </Button>
           </div>
-          <Button onClick={run} loading={busy}>
-            <ShieldCheck size={15} /> Run check
+        </Card>
+      )}
+
+      {jobId && !done && <VerifyProgressCard job={job} onCancel={cancel} />}
+
+      {jobId && done && job?.status === "cancelled" && (
+        <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/8 px-4 py-3 text-sm text-warning">
+          <Ban size={16} /> Check cancelled.
+        </div>
+      )}
+      {jobId && done && job?.status === "failed" && job.error && !job.result && <ErrorState message={job.error} />}
+      {jobId && done && job?.result && <ResultView result={job.result} />}
+      {jobId && done && (
+        <div className="flex justify-end">
+          <Button variant="secondary" size="sm" onClick={newCheck}>
+            Run another check
           </Button>
         </div>
-      </Card>
+      )}
 
       {error && <ErrorState message={error} />}
-      {result && <ResultView result={result} />}
     </div>
+  );
+}
+
+function VerifyProgressCard({ job, onCancel }: { job: VerifyJobProgress | null; onCancel: () => void }) {
+  const statusLabel =
+    job?.status === "sampling" ? "Sampling…" : job?.status === "cross_checking" ? "Cross-checking recovery…" : job?.status;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Erasure check"
+        icon={<ShieldCheck size={16} />}
+        action={job ? <Badge tone="info">{job.status}</Badge> : undefined}
+      />
+      <div className="space-y-4 p-5">
+        {!job && <Spinner label="Starting…" />}
+
+        {job && (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-fg-muted">{statusLabel}</span>
+              {job.percent != null && <DataValue className="font-medium text-fg">{job.percent.toFixed(0)}%</DataValue>}
+            </div>
+            <ProgressBar percent={job.percent ?? 0} />
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <Stat label="Samples" value={`${job.samples_done} / ${job.total_samples || "—"}`} />
+              <Stat label="ETA" value={formatDuration(job.eta_seconds)} />
+            </div>
+            <div className="flex justify-end border-t border-border pt-4">
+              <Button variant="danger" size="sm" onClick={onCancel}>
+                <Ban size={15} /> Cancel check
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 

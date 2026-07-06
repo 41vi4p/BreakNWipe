@@ -31,6 +31,7 @@ from .models import (
 )
 from .session_manager import WipeSessionManager
 from .recovery_manager import RecoverySessionManager
+from .verify_manager import VerifySessionManager
 from ..device.filesystem import list_partitions
 from ..device.health import get_device_health
 from ..device.fsck import FilesystemChecker
@@ -52,8 +53,10 @@ class WebServer:
         )
         self.session_manager = WipeSessionManager()
         self.recovery_manager = RecoverySessionManager()
+        self.verify_manager = VerifySessionManager()
         self.websocket_connections: Dict[str, List[WebSocket]] = {}
         self.recovery_ws_connections: Dict[str, List[WebSocket]] = {}
+        self.verify_ws_connections: Dict[str, List[WebSocket]] = {}
         # Folders a recovery operation has actually written to in this server's
         # lifetime -- the only directories /api/recovery/view is allowed to read
         # from, so browsing recovered files can't be turned into an arbitrary
@@ -192,18 +195,45 @@ class WebServer:
                 logger.exception(f"fsck failed for {request.partition}")
                 raise HTTPException(status_code=500, detail="fsck failed. See server logs for details.")
 
-        @self.app.post("/api/verify/erasure")
-        def verify_erasure_endpoint(request: ErasureCheckRequest):
-            """Read-only check of whether a device has actually been wiped --
-            statistical sampling (entropy/pattern/file-signature) of the raw
-            device plus a best-effort recovery cross-check on any still-
-            recognizable filesystem. Never writes to the device."""
+        @self.app.post("/api/verify/erasure/start")
+        def verify_erasure_start_endpoint(request: ErasureCheckRequest):
+            """Start a read-only erasure check as a background job and return
+            its job_id immediately -- a paranoid-depth check can read up to
+            100MB and take a while. Progress streams over
+            WS /ws/verify/{job_id}; GET /api/verify/erasure/{job_id} polls the
+            same state for reconnects."""
             try:
-                from ..device.erasure_check import check_erasure
-                return JSONResponse(content=check_erasure(request.device, request.depth).to_dict())
+                job_id = self.verify_manager.start_check(request.device, request.depth)
+
+                def progress_callback(payload: Dict[str, Any]):
+                    try:
+                        if self.event_loop and not self.event_loop.is_closed():
+                            asyncio.run_coroutine_threadsafe(
+                                self._broadcast_verify_progress(job_id, payload), self.event_loop
+                            )
+                    except Exception as e:
+                        logger.debug(f"Failed to broadcast verify progress: {e}")
+
+                self.verify_manager.add_progress_callback(job_id, progress_callback)
+                return JSONResponse(content={"job_id": job_id})
             except Exception:
-                logger.exception(f"Erasure check failed for {request.device}")
-                raise HTTPException(status_code=500, detail="Erasure check failed. See server logs for details.")
+                logger.exception(f"Failed to start erasure check for {request.device}")
+                raise HTTPException(status_code=500, detail="Failed to start erasure check. See server logs for details.")
+
+        @self.app.get("/api/verify/erasure/{job_id}")
+        def verify_erasure_status_endpoint(job_id: str):
+            """Current state of an erasure-check job -- used to reconnect
+            after navigating away."""
+            job = self.verify_manager.get_job(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="Verify job not found.")
+            return JSONResponse(content=job.to_dict())
+
+        @self.app.post("/api/verify/erasure/{job_id}/cancel")
+        def verify_erasure_cancel_endpoint(job_id: str):
+            """Stop a running erasure check early."""
+            ok = self.verify_manager.cancel_job(job_id)
+            return JSONResponse(content={"success": ok})
 
         @self.app.get("/api/devices/{device_path:path}/sectors")
         def read_sectors_endpoint(device_path: str, offset: int = 0, length: int = 512):
@@ -882,6 +912,38 @@ class WebServer:
                     except ValueError:
                         pass
 
+        @self.app.websocket("/ws/verify/{job_id}")
+        async def verify_websocket_endpoint(websocket: WebSocket, job_id: str):
+            """WebSocket endpoint for erasure-check job progress."""
+            await websocket.accept()
+
+            if job_id not in self.verify_ws_connections:
+                self.verify_ws_connections[job_id] = []
+            self.verify_ws_connections[job_id].append(websocket)
+
+            try:
+                job = self.verify_manager.get_job(job_id)
+                if job:
+                    message = WebSocketMessage(type="verify_progress", session_id=job_id, data=job.to_dict())
+                    await websocket.send_text(message.json())
+
+                while True:
+                    try:
+                        await websocket.receive_text()
+                    except WebSocketDisconnect:
+                        break
+
+            except WebSocketDisconnect:
+                pass
+            finally:
+                if job_id in self.verify_ws_connections:
+                    try:
+                        self.verify_ws_connections[job_id].remove(websocket)
+                        if not self.verify_ws_connections[job_id]:
+                            del self.verify_ws_connections[job_id]
+                    except ValueError:
+                        pass
+
         @self.app.get("/api/health")
         async def health_check():
             """Health check endpoint."""
@@ -1007,6 +1069,26 @@ class WebServer:
         for client in disconnected_clients:
             try:
                 self.recovery_ws_connections[job_id].remove(client)
+            except ValueError:
+                pass
+
+    async def _broadcast_verify_progress(self, job_id: str, data: Dict[str, Any]):
+        """Broadcast an erasure-check job's progress to connected WebSocket clients."""
+        if job_id not in self.verify_ws_connections:
+            return
+
+        message = WebSocketMessage(type="verify_progress", session_id=job_id, data=data)
+
+        disconnected_clients = []
+        for websocket in self.verify_ws_connections[job_id]:
+            try:
+                await websocket.send_text(message.json())
+            except Exception:
+                disconnected_clients.append(websocket)
+
+        for client in disconnected_clients:
+            try:
+                self.verify_ws_connections[job_id].remove(client)
             except ValueError:
                 pass
 

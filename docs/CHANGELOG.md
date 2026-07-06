@@ -4,6 +4,26 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.5.0] - 2026-07-06
+
+### Added
+- **Progress bar, ETA, and cancel for erasure verification.** Unlike deep-scan recovery (an external
+  PhotoRec process with no scripted progress API), `WipeVerifier`'s sampling loop is our own Python
+  code, so progress tracking needed no polling hacks: `verify_wipe_detailed()` now accepts a
+  `progress_callback` (invoked after every sample with exact `samples_done`/`total_samples`/`percent`/
+  `eta_seconds`) and a `cancel_event`, checked before each sample so a long paranoid-depth check can be
+  stopped early. Refactored the three verification depths (quick/comprehensive/paranoid) onto a shared
+  `_run_samples()` loop to avoid tripling this logic.
+- `device/erasure_check.py`'s `check_erasure()` forwards both through to `WipeVerifier`, emitting its
+  own `sampling` → `cross_checking` → `completed`/`cancelled` status transitions (cancellation is also
+  honored between partitions during the recovery cross-check phase, not just during sampling).
+- New `web/verify_manager.py` (`VerifySessionManager`), mirroring `RecoverySessionManager`: erasure
+  checks run as background jobs. `POST /api/verify/erasure/start` returns a `job_id` immediately,
+  progress streams over `WS /ws/verify/{job_id}`, `GET /api/verify/erasure/{job_id}` polls the same
+  state for reconnects, and `POST .../cancel` stops one early. The GUI's `/verify` page now shows a
+  progress bar, samples-done counter, ETA, and a Cancel button while checking, matching the wipe and
+  deep-scan-recovery progress UIs. The CLI's `breaknwipe verify` gained a matching Rich progress bar.
+
 ## [3.4.0] - 2026-07-06
 
 ### Added

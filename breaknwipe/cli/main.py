@@ -484,7 +484,30 @@ def verify(device, depth):
     from ..device.erasure_check import check_erasure
 
     console.print(f"[blue]Checking erasure of {device} ({depth})…[/blue]")
-    result = check_erasure(device, depth)
+
+    from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
+
+    progress_bar = Progress(
+        TextColumn("[cyan]{task.description}"),
+        BarColumn(bar_width=40, complete_style="green", finished_style="green"),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    )
+    task_id = progress_bar.add_task("Sampling…", total=100)
+
+    def on_progress(payload):
+        percent = payload.get("percent")
+        if percent is not None:
+            progress_bar.update(task_id, completed=percent)
+        status = payload.get("status")
+        if status == "cross_checking":
+            progress_bar.update(task_id, description="Cross-checking recovery…", completed=100)
+
+    with progress_bar:
+        result = check_erasure(device, depth, progress_callback=on_progress)
+        progress_bar.update(task_id, completed=100)
 
     if result.refused:
         console.print(f"[red]Refused:[/red] {result.refusal_reason}")

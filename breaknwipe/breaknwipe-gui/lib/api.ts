@@ -315,6 +315,7 @@ export interface ErasureCheckResult {
   device: string;
   depth: string;
   passed: boolean;
+  cancelled: boolean;
   samples_checked: number;
   avg_entropy: number;
   pattern_detections: number;
@@ -325,6 +326,23 @@ export interface ErasureCheckResult {
   error: string;
   refused: boolean;
   refusal_reason: string;
+}
+
+export type VerifyJobStatus = "pending" | "sampling" | "cross_checking" | "completed" | "failed" | "cancelled";
+
+export const VERIFY_JOB_TERMINAL = ["completed", "failed", "cancelled"];
+
+export interface VerifyJobProgress {
+  job_id: string;
+  device: string;
+  depth: string;
+  status: VerifyJobStatus;
+  percent: number | null;
+  samples_done: number;
+  total_samples: number;
+  eta_seconds: number | null;
+  result: ErasureCheckResult | null;
+  error: string | null;
 }
 
 // ---- Endpoints ----
@@ -369,6 +387,9 @@ export const api = {
     request<{ success: boolean }>(`/api/recovery/deep-scan/${jobId}/cancel`, { method: "POST" }),
   reports: () => request<Record<string, unknown>>("/api/reports"),
   systemInfo: () => request<Record<string, string>>("/api/system-info"),
-  verifyErasure: (body: { device: string; depth: string }) =>
-    request<ErasureCheckResult>("/api/verify/erasure", { method: "POST", body: JSON.stringify(body) }),
+  verifyErasureStart: (body: { device: string; depth: string }) =>
+    request<{ job_id: string }>("/api/verify/erasure/start", { method: "POST", body: JSON.stringify(body) }),
+  verifyErasureStatus: (jobId: string) => request<VerifyJobProgress>(`/api/verify/erasure/${jobId}`),
+  verifyErasureCancel: (jobId: string) =>
+    request<{ success: boolean }>(`/api/verify/erasure/${jobId}/cancel`, { method: "POST" }),
 };

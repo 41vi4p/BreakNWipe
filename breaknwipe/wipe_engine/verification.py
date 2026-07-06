@@ -8,9 +8,10 @@ Includes statistical analysis and entropy checking.
 import os
 import time
 import random
+import threading
 import logging
 import hashlib
-from typing import List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Tuple, Optional
 from collections import Counter
 import math
 
@@ -49,26 +50,89 @@ class WipeVerifier:
             return False
 
     def verify_wipe_detailed(self, device_path: str, device_size: int,
-                             verification_type: str = "comprehensive") -> dict:
+                             verification_type: str = "comprehensive",
+                             progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+                             cancel_event: Optional[threading.Event] = None) -> dict:
         """
         Verify that a device has been properly wiped, returning the full
         statistics behind the pass/fail verdict (sample count, entropy,
         pattern-detection rate, and any file-signature hits with their byte
         offsets) -- used by the GUI/CLI "Verify erasure" feature so the result
         is explainable, not just a bare boolean.
+
+        If given, `progress_callback` is invoked after every sample with a
+        dict of `samples_done`, `total_samples`, `percent`, `elapsed_seconds`,
+        and `eta_seconds`. `cancel_event`, if given, is checked before each
+        sample to allow stopping a long (paranoid) check early.
         """
         logger.info(f"Starting {verification_type} verification of {device_path}")
 
         if verification_type == "quick":
-            return self._quick_verification(device_path, device_size)
+            return self._quick_verification(device_path, device_size, progress_callback, cancel_event)
         elif verification_type == "comprehensive":
-            return self._comprehensive_verification(device_path, device_size)
+            return self._comprehensive_verification(device_path, device_size, progress_callback, cancel_event)
         elif verification_type == "paranoid":
-            return self._paranoid_verification(device_path, device_size)
+            return self._paranoid_verification(device_path, device_size, progress_callback, cancel_event)
         else:
             raise ValueError(f"Unknown verification type: {verification_type}")
 
-    def _quick_verification(self, device_path: str, device_size: int) -> dict:
+    def _run_samples(self, device_path: str, device_size: int, sample_count: int,
+                     position_fn: Callable[[int], int],
+                     progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+                     cancel_event: Optional[threading.Event]) -> Tuple[List[float], int, List[Dict[str, Any]], bool]:
+        """
+        Shared sampling loop used by all three verification depths: reads
+        `sample_count` samples (byte offset for sample `i` given by
+        `position_fn(i)`), scoring entropy/recoverable-pattern/file-signature
+        per sample and reporting progress after each. Returns
+        (entropy_scores, pattern_detections, signature_hits, cancelled).
+        """
+        entropy_scores: List[float] = []
+        signature_hits: List[Dict[str, Any]] = []
+        pattern_detections = 0
+        cancelled = False
+        start = time.time()
+
+        with open(device_path, 'rb') as device:
+            for i in range(sample_count):
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                    break
+
+                position = min(position_fn(i), max(0, device_size - self.sample_size))
+                device.seek(position)
+                data = device.read(min(self.sample_size, device_size - position))
+
+                entropy_scores.append(self._calculate_entropy(data))
+                if self._contains_recoverable_data(data):
+                    pattern_detections += 1
+                sig = self._check_file_signatures(data)
+                if sig:
+                    signature_hits.append({'offset': position, 'signature': sig})
+
+                if progress_callback is not None:
+                    done = i + 1
+                    elapsed = time.time() - start
+                    rate = done / elapsed if elapsed > 0 else 0
+                    remaining = sample_count - done
+                    eta = remaining / rate if rate > 0 else None
+                    try:
+                        progress_callback({
+                            'status': 'running',
+                            'samples_done': done,
+                            'total_samples': sample_count,
+                            'percent': done / sample_count * 100,
+                            'elapsed_seconds': elapsed,
+                            'eta_seconds': eta,
+                        })
+                    except Exception:
+                        logger.debug("verification progress_callback raised", exc_info=True)
+
+        return entropy_scores, pattern_detections, signature_hits, cancelled
+
+    def _quick_verification(self, device_path: str, device_size: int,
+                            progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+                            cancel_event: Optional[threading.Event] = None) -> dict:
         """Quick verification by checking a few random samples."""
         sample_count = min(10, device_size // self.sample_size)
         if sample_count == 0:
@@ -76,23 +140,12 @@ class WipeVerifier:
 
         logger.debug(f"Quick verification with {sample_count} samples")
 
-        pattern_detections = 0
-        entropy_scores = []
-        signature_hits = []
-
-        with open(device_path, 'rb') as device:
-            for _ in range(sample_count):
-                position = random.randint(0, max(0, device_size - self.sample_size))
-                device.seek(position)
-                data = device.read(min(self.sample_size, device_size - position))
-
-                entropy_scores.append(self._calculate_entropy(data))
-                if self._contains_recoverable_data(data):
-                    pattern_detections += 1
-                    logger.warning(f"Potential data found at position {position}")
-                sig = self._check_file_signatures(data)
-                if sig:
-                    signature_hits.append({'offset': position, 'signature': sig})
+        position_fn = lambda i: random.randint(0, max(0, device_size - self.sample_size))  # noqa: E731
+        entropy_scores, pattern_detections, signature_hits, cancelled = self._run_samples(
+            device_path, device_size, sample_count, position_fn, progress_callback, cancel_event
+        )
+        if cancelled:
+            return self._cancelled_result('quick', len(entropy_scores), sample_count)
 
         passed = pattern_detections == 0 and not signature_hits
         return {
@@ -106,7 +159,9 @@ class WipeVerifier:
             'notes': [] if passed else ['Recoverable-looking data or file signatures were found in sampled sectors.'],
         }
 
-    def _comprehensive_verification(self, device_path: str, device_size: int) -> dict:
+    def _comprehensive_verification(self, device_path: str, device_size: int,
+                                    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+                                    cancel_event: Optional[threading.Event] = None) -> dict:
         """Comprehensive verification with statistical analysis."""
         sample_count = min(100, device_size // self.sample_size)
         if sample_count == 0:
@@ -114,30 +169,17 @@ class WipeVerifier:
 
         logger.debug(f"Comprehensive verification with {sample_count} samples")
 
-        entropy_scores = []
-        pattern_detections = 0
-        signature_hits = []
+        def position_fn(i: int) -> int:
+            # Read samples both randomly and sequentially
+            if i % 2 == 0 or sample_count // 2 == 0:
+                return random.randint(0, max(0, device_size - self.sample_size))
+            return (i // 2) * (device_size // (sample_count // 2))
 
-        with open(device_path, 'rb') as device:
-            for i in range(sample_count):
-                # Read samples both randomly and sequentially
-                if i % 2 == 0:
-                    position = random.randint(0, max(0, device_size - self.sample_size))
-                else:
-                    position = (i // 2) * (device_size // (sample_count // 2))
-
-                position = min(position, device_size - self.sample_size)
-                device.seek(position)
-                data = device.read(min(self.sample_size, device_size - position))
-
-                if self._contains_recoverable_data(data):
-                    pattern_detections += 1
-
-                sig = self._check_file_signatures(data)
-                if sig:
-                    signature_hits.append({'offset': position, 'signature': sig})
-
-                entropy_scores.append(self._calculate_entropy(data))
+        entropy_scores, pattern_detections, signature_hits, cancelled = self._run_samples(
+            device_path, device_size, sample_count, position_fn, progress_callback, cancel_event
+        )
+        if cancelled:
+            return self._cancelled_result('comprehensive', len(entropy_scores), sample_count)
 
         avg_entropy = sum(entropy_scores) / len(entropy_scores)
         pattern_percentage = (pattern_detections / sample_count) * 100
@@ -172,7 +214,9 @@ class WipeVerifier:
             'notes': notes,
         }
 
-    def _paranoid_verification(self, device_path: str, device_size: int) -> dict:
+    def _paranoid_verification(self, device_path: str, device_size: int,
+                               progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+                               cancel_event: Optional[threading.Event] = None) -> dict:
         """Paranoid verification reading larger portions of the device."""
         # Read 1% of device or max 100MB, whichever is smaller
         read_size = min(device_size // 100, 100 * 1024 * 1024)
@@ -184,24 +228,12 @@ class WipeVerifier:
             chunks = 1
         logger.debug(f"Paranoid verification reading {chunks} chunks totaling {read_size} bytes")
 
-        pattern_detections = 0
-        entropy_scores = []
-        signature_hits = []
-
-        with open(device_path, 'rb') as device:
-            for _ in range(chunks):
-                position = random.randint(0, max(0, device_size - self.sample_size))
-                device.seek(position)
-                data = device.read(min(self.sample_size, device_size - position))
-
-                entropy_scores.append(self._calculate_entropy(data))
-                if self._contains_recoverable_data(data):
-                    pattern_detections += 1
-
-                sig = self._check_file_signatures(data)
-                if sig:
-                    signature_hits.append({'offset': position, 'signature': sig})
-                    logger.warning(f"File signature detected at position {position}")
+        position_fn = lambda i: random.randint(0, max(0, device_size - self.sample_size))  # noqa: E731
+        entropy_scores, pattern_detections, signature_hits, cancelled = self._run_samples(
+            device_path, device_size, chunks, position_fn, progress_callback, cancel_event
+        )
+        if cancelled:
+            return self._cancelled_result('paranoid', len(entropy_scores), chunks)
 
         pattern_percentage = (pattern_detections / chunks) * 100
         logger.info(f"Paranoid verification: {pattern_percentage:.1f}% patterns detected")
@@ -223,6 +255,21 @@ class WipeVerifier:
             'pattern_detection_percent': pattern_percentage,
             'signature_hits': signature_hits,
             'notes': notes,
+        }
+
+    def _cancelled_result(self, verification_type: str, samples_done: int, total_samples: int) -> dict:
+        """Uniform partial-result shape when a check is stopped early via cancel_event."""
+        return {
+            'passed': False,
+            'cancelled': True,
+            'verification_type': verification_type,
+            'samples_checked': samples_done,
+            'total_samples': total_samples,
+            'avg_entropy': 0.0,
+            'pattern_detections': 0,
+            'pattern_detection_percent': 0.0,
+            'signature_hits': [],
+            'notes': ['Cancelled by user.'],
         }
 
     def _contains_recoverable_data(self, data: bytes) -> bool:

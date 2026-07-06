@@ -19,8 +19,9 @@ Never writes to the device.
 """
 
 import logging
+import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .filesystem import InvalidDevicePathError, list_partitions, validate_block_device_path
 from .hexview import device_size_bytes
@@ -51,6 +52,7 @@ class ErasureCheckResult:
     device: str
     depth: str
     passed: bool = False
+    cancelled: bool = False
     samples_checked: int = 0
     avg_entropy: float = 0.0
     pattern_detections: int = 0
@@ -67,6 +69,7 @@ class ErasureCheckResult:
             "device": self.device,
             "depth": self.depth,
             "passed": self.passed,
+            "cancelled": self.cancelled,
             "samples_checked": self.samples_checked,
             "avg_entropy": self.avg_entropy,
             "pattern_detections": self.pattern_detections,
@@ -80,9 +83,32 @@ class ErasureCheckResult:
         }
 
 
-def check_erasure(device_path: str, depth: str = "comprehensive") -> ErasureCheckResult:
-    """Read-only check of whether device_path appears to have been wiped clean."""
+def check_erasure(
+    device_path: str,
+    depth: str = "comprehensive",
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> ErasureCheckResult:
+    """Read-only check of whether device_path appears to have been wiped clean.
+
+    If given, `progress_callback` is invoked periodically with a dict of
+    `status` ("sampling"/"cross_checking"/"completed"/"cancelled"),
+    `samples_done`, `total_samples`, `percent`, and `eta_seconds` -- forwarded
+    from `WipeVerifier.verify_wipe_detailed()` for the sampling phase, with an
+    extra `cross_checking` event before the (usually fast) recovery cross-
+    check phase. `cancel_event`, if given, can stop a long (paranoid) check
+    early; already-cancelled before the cross-check phase, that phase is
+    skipped entirely.
+    """
     result = ErasureCheckResult(device=device_path, depth=depth)
+
+    def _emit(status: str, **fields: Any) -> None:
+        if progress_callback is None:
+            return
+        try:
+            progress_callback({"status": status, **fields})
+        except Exception:
+            logger.debug("erasure check progress_callback raised", exc_info=True)
 
     try:
         validate_block_device_path(device_path)
@@ -101,14 +127,26 @@ def check_erasure(device_path: str, depth: str = "comprehensive") -> ErasureChec
         result.error = "Device reports zero size."
         return result
 
+    def _sampling_progress(payload: Dict[str, Any]) -> None:
+        _emit(
+            "sampling",
+            samples_done=payload.get("samples_done"),
+            total_samples=payload.get("total_samples"),
+            percent=payload.get("percent"),
+            eta_seconds=payload.get("eta_seconds"),
+        )
+
     try:
-        stats = WipeVerifier().verify_wipe_detailed(device_path, size, depth)
+        stats = WipeVerifier().verify_wipe_detailed(
+            device_path, size, depth, progress_callback=_sampling_progress, cancel_event=cancel_event
+        )
     except Exception as e:
         logger.exception(f"Erasure check failed for {device_path}")
         result.error = f"Verification failed: {e}"
         return result
 
     result.passed = stats["passed"]
+    result.cancelled = bool(stats.get("cancelled"))
     result.samples_checked = stats["samples_checked"]
     result.avg_entropy = stats["avg_entropy"]
     result.pattern_detections = stats["pattern_detections"]
@@ -116,9 +154,14 @@ def check_erasure(device_path: str, depth: str = "comprehensive") -> ErasureChec
     result.signature_hits = stats["signature_hits"]
     result.notes = list(stats["notes"])
 
+    if result.cancelled:
+        _emit("cancelled")
+        return result
+
     # Best-effort recovery cross-check: if a filesystem is still recognizable,
     # confirm nothing named is recoverable from it. No recognizable filesystem
     # at all is itself a good sign after a real wipe, not a failure.
+    _emit("cross_checking")
     try:
         partitions = list_partitions(device_path)
     except Exception:
@@ -128,6 +171,10 @@ def check_erasure(device_path: str, depth: str = "comprehensive") -> ErasureChec
         result.notes.append("No recognizable filesystem or partition table -- expected after a wipe.")
     else:
         for p in partitions:
+            if cancel_event is not None and cancel_event.is_set():
+                result.cancelled = True
+                _emit("cancelled")
+                return result
             if not p.fstype:
                 result.partition_checks.append(PartitionRecoveryCheck(
                     partition=p.path, filesystem=None, named_files_found=0,
@@ -157,4 +204,5 @@ def check_erasure(device_path: str, depth: str = "comprehensive") -> ErasureChec
                 note="Nothing recoverable by name." if not named else f"{len(named)} file(s) still recoverable by name.",
             ))
 
+    _emit("completed")
     return result
