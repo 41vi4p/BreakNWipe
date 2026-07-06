@@ -61,10 +61,6 @@ export default function HomePage() {
 
       <div className="relative mx-auto max-w-5xl px-5 pb-16 pt-16 sm:pt-24">
         <div className="max-w-2xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-surface/80 px-3 py-1 text-xs font-medium text-fg-muted backdrop-blur">
-            <span className="data text-primary">0F 9D 63</span>
-            <span>· the color of a byte you can trust</span>
-          </div>
           <h1 className="text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
             Know exactly what happened to your data.
           </h1>
@@ -120,8 +116,9 @@ export default function HomePage() {
 
 // Deterministic (not Math.random) so the static-exported HTML and the client
 // hydration render identical bytes -- a decorative hex dump, the product's own
-// visual language, with the brand color's hex code (0f 9d 63) picked out in
-// primary where a real "found it" highlight would land in the hex viewer.
+// visual language (this is what the hex viewer actually looks like scanning a
+// drive). A soft highlight bar sweeps down through it on a loop, standing in
+// for "actively being scanned" -- purely ambient, no literal bytes called out.
 function pseudoByte(i: number): string {
   const v = (i * 2654435761) >>> 24;
   return v.toString(16).padStart(2, "0");
@@ -130,20 +127,11 @@ function pseudoByte(i: number): string {
 function HeroTexture() {
   const cols = 18;
   const rows = 10;
-  const highlightRow = 4;
-  const highlightStart = 6;
-  const highlightBytes = ["0f", "9d", "63"];
 
   const rowEls = Array.from({ length: rows }, (_, r) => {
-    const cells = Array.from({ length: cols }, (_, c) => {
-      const isHighlight = r === highlightRow && c >= highlightStart && c < highlightStart + highlightBytes.length;
-      const value = isHighlight ? highlightBytes[c - highlightStart] : pseudoByte(r * cols + c);
-      return (
-        <span key={c} className={isHighlight ? "text-primary" : undefined}>
-          {value}{" "}
-        </span>
-      );
-    });
+    const cells = Array.from({ length: cols }, (_, c) => (
+      <span key={c}>{pseudoByte(r * cols + c)} </span>
+    ));
     return (
       <div key={r} className="whitespace-pre">
         {cells}
@@ -154,9 +142,10 @@ function HeroTexture() {
   return (
     <div
       aria-hidden
-      className="data pointer-events-none absolute inset-x-0 top-0 z-0 select-none text-[13px] leading-[1.9] text-fg-subtle/[0.12] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+      className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[260px] select-none overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]"
     >
-      {rowEls}
+      <div className="data text-[13px] leading-[1.9] text-fg-subtle/[0.12]">{rowEls}</div>
+      <div className="hero-scan absolute inset-x-0 h-16 bg-gradient-to-b from-transparent via-primary/[0.09] to-transparent" />
     </div>
   );
 }
