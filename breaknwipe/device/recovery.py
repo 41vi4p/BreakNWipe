@@ -30,8 +30,10 @@ import os
 import re
 import shutil
 import subprocess
+import threading
+import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .filesystem import (
     InvalidDevicePathError,
@@ -287,9 +289,43 @@ def recover_files(partition: str, inodes: List[str], output_dir: str,
     return result
 
 
-def deep_scan_recover(partition: str, output_dir: str) -> RecoverResult:
+def _proc_read_bytes(pid: int) -> Optional[int]:
+    """Bytes actually read from storage by a process so far, via /proc/<pid>/io.
+
+    PhotoRec has no scripted progress API in /cmd (unattended) mode, and it
+    seeks with pread() rather than moving its file descriptor's offset, so
+    /proc/<pid>/fdinfo's `pos:` field is useless (it jumps to EOF immediately,
+    from PhotoRec's initial size probe, and never moves again). read_bytes is
+    the only externally observable signal that tracks real scan activity --
+    it's an approximation (PhotoRec fast-skips large empty/duplicate regions,
+    so it won't necessarily reach the device's full size), which is why the
+    caller clamps the derived percentage below 100 until the process exits.
+    """
+    try:
+        with open(f"/proc/{pid}/io") as f:
+            for line in f:
+                if line.startswith("read_bytes:"):
+                    return int(line.split(":", 1)[1].strip())
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError):
+        return None
+    return None
+
+
+def deep_scan_recover(
+    partition: str,
+    output_dir: str,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> RecoverResult:
     """Signature-carve recoverable file contents with PhotoRec (all filesystems,
-    recovers bodies without original names). Writes to output_dir/recovered_carved."""
+    recovers bodies without original names). Writes to output_dir/recovered_carved.
+
+    If given, `progress_callback` is invoked periodically (about once a second)
+    with a dict of `status` ("running"/"cancelled"/"completed"), `percent`
+    (approximate, see `_proc_read_bytes`), `bytes_processed`, `total_bytes`,
+    `rate_bytes_per_sec`, and `eta_seconds`. `cancel_event`, if given, is
+    polled to allow stopping a long-running deep scan early.
+    """
     result = RecoverResult(partition=partition, output_dir=output_dir)
 
     try:
@@ -318,25 +354,83 @@ def deep_scan_recover(partition: str, output_dir: str) -> RecoverResult:
         result.error = f"Could not create output folder: {e}"
         return result
 
+    total_bytes = 0
+    try:
+        from .hexview import device_size_bytes
+        total_bytes = device_size_bytes(partition)
+    except Exception:
+        total_bytes = 0
+
+    def _emit(status: str, **fields: Any) -> None:
+        if progress_callback is None:
+            return
+        try:
+            progress_callback({"status": status, "total_bytes": total_bytes, **fields})
+        except Exception:
+            logger.debug("recovery progress_callback raised", exc_info=True)
+
     recup = os.path.join(output_dir, "recovered_carved")
     # Non-interactive batch invocation (verified): search the whole space,
-    # enable all file types, recover to `recup`.
+    # enable all file types, recover to `recup`. cwd=output_dir keeps the
+    # photorec.log PhotoRec writes into the CURRENT working directory (an
+    # undocumented behavior) contained there instead of leaking into the
+    # server/CLI process's own cwd.
     cmd = ["photorec", "/log", "/d", recup, "/cmd", partition,
            "wholespace,fileopt,everything,enable,search"]
     try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=None)
+        proc = subprocess.Popen(cmd, cwd=output_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except (subprocess.SubprocessError, OSError) as e:
-        result.error = f"photorec failed: {e}"
+        result.error = f"photorec failed to start: {e}"
+        return result
+
+    _emit("running", percent=0.0, bytes_processed=0, rate_bytes_per_sec=0.0, eta_seconds=None)
+
+    cancelled = False
+    last_bytes = 0
+    last_time = time.monotonic()
+    while proc.poll() is None:
+        if cancel_event is not None and cancel_event.is_set():
+            proc.terminate()
+            cancelled = True
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+            break
+        time.sleep(1.0)
+        read_bytes = _proc_read_bytes(proc.pid)
+        now = time.monotonic()
+        if read_bytes is not None:
+            dt = now - last_time
+            rate = (read_bytes - last_bytes) / dt if dt > 0 else 0.0
+            percent = min(99.0, read_bytes / total_bytes * 100) if total_bytes > 0 else None
+            remaining = max(0, total_bytes - read_bytes) if total_bytes > 0 else None
+            eta = remaining / rate if (rate > 0 and remaining is not None) else None
+            _emit("running", percent=percent, bytes_processed=read_bytes,
+                  rate_bytes_per_sec=rate, eta_seconds=eta)
+            last_bytes, last_time = read_bytes, now
+    else:
+        proc.wait()
+
+    if cancelled:
+        result.error = "Cancelled."
+        _emit("cancelled", percent=None, bytes_processed=last_bytes, eta_seconds=None)
         return result
 
     # PhotoRec writes into recup.1, recup.2, ... -- collect the carved files.
+    # photorec.log lives directly in output_dir (see cwd= above); skip it and
+    # the per-run report.xml, neither of which is recovered content.
     for root, _dirs, files in os.walk(output_dir):
         for fn in files:
-            if fn.endswith(".xml"):
+            if fn.endswith(".xml") or fn == "photorec.log":
                 continue
             result.recovered += 1
             result.recovered_files.append(os.path.join(root, fn))
 
     if result.recovered == 0 and not result.error:
         result.error = "PhotoRec found no recoverable file signatures (data may be overwritten)."
+
+    _emit("completed", percent=100.0, bytes_processed=total_bytes or last_bytes,
+          eta_seconds=0, recovered=result.recovered)
     return result

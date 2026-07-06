@@ -29,7 +29,15 @@ mkloop() {  # $1 = size (e.g. 64M) -> prints loop dev
   echo "$dev"
 }
 
-run_py() { (cd "$REPO" && uv run python -c "$1"); }
+UV_BIN="$(command -v uv || true)"
+if [ -z "$UV_BIN" ]; then
+  for candidate in "/home/${SUDO_USER:-$USER}/.local/bin/uv" "/home/${SUDO_USER:-$USER}/.cargo/bin/uv" /usr/local/bin/uv; do
+    [ -x "$candidate" ] && UV_BIN="$candidate" && break
+  done
+fi
+[ -z "$UV_BIN" ] && fail "uv not found -- run this as a normal user's sudo (not a stripped-PATH root shell), or install uv system-wide"
+
+run_py() { (cd "$REPO" && "$UV_BIN" run python -c "$1"); }
 
 # ---------------------------------------------------------------- NTFS undelete
 say "1. NTFS undelete with filenames (fls/icat)"
@@ -90,22 +98,51 @@ EXT="$(mkloop 96M)"
 mkfs.ext4 -q -F "$EXT" >/dev/null 2>&1
 EMNT="$WORK/mnt_ext"; mkdir -p "$EMNT"
 mount "$EXT" "$EMNT"
-# A JPEG-signatured file photorec can carve by magic bytes.
-printf '\xff\xd8\xff\xe0\x00\x10JFIF' > "$EMNT/photo.jpg"
-head -c 20000 /dev/urandom >> "$EMNT/photo.jpg"
-printf '\xff\xd9' >> "$EMNT/photo.jpg"
+# A real gzip file -- PhotoRec validates internal structure, not just magic
+# bytes, so a hand-crafted fake (e.g. bare JPEG markers) gets discarded as
+# corrupt. A real gzip stream carves and passes `gzip -t` cleanly.
+for i in $(seq 1 50); do echo "deep-scan carve test payload line $i $(date)"; done > "$WORK/payload.txt"
+gzip -c "$WORK/payload.txt" > "$EMNT/archive.gz"
 sync
-rm -f "$EMNT/photo.jpg"; sync
+rm -f "$EMNT/archive.gz"; sync
 umount "$EMNT"
 CARVE="$WORK/carved"; mkdir -p "$CARVE"
 run_py "
+import gzip as gziplib
 from breaknwipe.device.recovery import deep_scan_recover
-r = deep_scan_recover('$EXT', '$CARVE')
+
+events = []
+r = deep_scan_recover('$EXT', '$CARVE', progress_callback=events.append)
+
 assert not r.refused, r.refusal_reason
 print('carved:', r.recovered, r.error)
+print('recovered_files:', r.recovered_files)
 assert r.recovered >= 1, 'photorec carved nothing: ' + str(r.to_dict())
+gz_candidates = [f for f in r.recovered_files if f.endswith('.gz')]
+assert gz_candidates, 'no .gz among recovered files: ' + str(r.recovered_files)
+ok = False
+for f in gz_candidates:
+    try:
+        with gziplib.open(f, 'rb') as fh:
+            fh.read()
+        ok = True
+        print('valid gzip:', f)
+        break
+    except Exception as e:
+        print('corrupt:', f, e)
+assert ok, 'none of the carved .gz files decompressed cleanly'
+
+# Progress callback: fired at least at start ('running') and end ('completed'),
+# with a total_bytes matching the device, and a final 100% completion.
+print('progress events:', len(events), [e['status'] for e in events])
+assert len(events) >= 2, 'expected at least a running + completed event: ' + str(events)
+assert events[0]['status'] == 'running', events[0]
+assert events[-1]['status'] == 'completed', events[-1]
+assert events[-1]['percent'] == 100.0, events[-1]
+assert events[-1]['total_bytes'] > 0, events[-1]
 "
-pass "photorec carved >=1 file from ext4"
+pass "photorec-carved file is a valid, intact gzip"
+pass "deep-scan progress callback fires running -> completed with sane totals"
 
 # ------------------------------------------------------------ honesty check
 say "4. After a full zero-wipe, nothing recoverable"

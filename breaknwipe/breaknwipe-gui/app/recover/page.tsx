@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Ban,
   FileSearch,
   FolderInput,
   Info,
@@ -13,13 +14,16 @@ import {
 } from "lucide-react";
 import {
   api,
+  RECOVERY_JOB_TERMINAL,
   type Partition,
   type RecoverableFile,
   type RecoveryScanResult,
   type RecoveryRestoreResult,
+  type RecoveryJobProgress,
 } from "@/lib/api";
 import { useAsync, useQueryParam } from "@/lib/hooks";
-import { formatBytes } from "@/lib/format";
+import { useWebSocket } from "@/lib/use-websocket";
+import { formatBytes, formatDuration } from "@/lib/format";
 import {
   Badge,
   Button,
@@ -29,6 +33,7 @@ import {
   EmptyState,
   ErrorState,
   PageTitle,
+  ProgressBar,
   Spinner,
 } from "@/components/ui";
 
@@ -109,9 +114,16 @@ function RecoverTool({
   const [outputDir, setOutputDir] = useState("");
   const [scan, setScan] = useState<RecoveryScanResult | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState<"scan" | "restore" | null>(null);
+  const [busy, setBusy] = useState<"scan" | "restore" | "starting" | null>(null);
   const [result, setResult] = useState<RecoveryRestoreResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deepJobId, setDeepJobId] = useState<string | null>(null);
+
+  const { last: deepLast } = useWebSocket<{ type: string; data: RecoveryJobProgress }>(
+    deepJobId ? `/ws/recovery/${deepJobId}` : null,
+  );
+  const deepJob = deepLast?.data ?? null;
+  const deepRunning = deepJob ? !RECOVERY_JOB_TERMINAL.includes(deepJob.status) : false;
 
   const selectedPartition = partitions.find((p) => p.path === partition);
 
@@ -131,7 +143,7 @@ function RecoverTool({
     }
   }
 
-  async function runRestore(deep: boolean) {
+  async function runRestore() {
     if (!outputDir.trim()) {
       setError("Choose a folder to recover files into — it must be on a different drive.");
       return;
@@ -143,8 +155,7 @@ function RecoverTool({
       const r = await api.recoveryRestore({
         partition,
         output_dir: outputDir.trim(),
-        inodes: deep ? [] : Array.from(selected),
-        deep_scan: deep,
+        inodes: Array.from(selected),
       });
       setResult(r);
     } catch (e) {
@@ -152,6 +163,37 @@ function RecoverTool({
     } finally {
       setBusy(null);
     }
+  }
+
+  async function startDeepScan() {
+    if (!outputDir.trim()) {
+      setError("Choose a folder to recover files into — it must be on a different drive.");
+      return;
+    }
+    setBusy("starting");
+    setError(null);
+    try {
+      const { job_id } = await api.recoveryDeepScanStart({ partition, output_dir: outputDir.trim() });
+      setDeepJobId(job_id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function cancelDeepScan() {
+    if (!deepJobId) return;
+    try {
+      await api.recoveryDeepScanCancel(deepJobId);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  function newDeepScan() {
+    setDeepJobId(null);
+    setError(null);
   }
 
   return (
@@ -169,6 +211,7 @@ function RecoverTool({
                   setScan(null);
                   setResult(null);
                   setSelected(new Set());
+                  setDeepJobId(null);
                 }}
                 className="data w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
@@ -214,7 +257,7 @@ function RecoverTool({
 
       {mode === "undelete" && scan && <ScanResults scan={scan} selected={selected} setSelected={setSelected} />}
 
-      {(mode === "deep" || (scan && scan.files.length > 0)) && (
+      {mode === "undelete" && scan && scan.files.length > 0 && !deepJobId && (
         <Card>
           <CardHeader title="Recover to" icon={<FolderInput size={16} />} />
           <div className="space-y-4 p-5">
@@ -230,25 +273,143 @@ function RecoverTool({
               />
             </label>
 
-            {mode === "undelete" ? (
-              <Button
-                onClick={() => runRestore(false)}
-                loading={busy === "restore"}
-                disabled={selected.size === 0}
-              >
-                <RotateCcw size={15} /> Recover {selected.size > 0 ? `${selected.size} selected` : "selected"}
-              </Button>
-            ) : (
-              <Button onClick={() => runRestore(true)} loading={busy === "restore"} disabled={!deepScanAvailable}>
-                <Sparkles size={15} /> Start deep scan &amp; recover
-              </Button>
-            )}
+            <Button onClick={runRestore} loading={busy === "restore"} disabled={selected.size === 0}>
+              <RotateCcw size={15} /> Recover {selected.size > 0 ? `${selected.size} selected` : "selected"}
+            </Button>
           </div>
         </Card>
       )}
 
+      {mode === "deep" && !deepJobId && (
+        <Card>
+          <CardHeader title="Recover to" icon={<FolderInput size={16} />} />
+          <div className="space-y-4 p-5">
+            <p className="text-sm text-fg-muted">
+              Deep scan reads the whole partition and rebuilds files by their content signatures. It
+              finds files even when the filesystem is damaged or the names are gone, but it can&apos;t
+              recover original filenames.
+            </p>
+            <label className="block">
+              <span className="mb-1.5 block text-xs text-fg-muted">
+                Output folder (must be on a different drive than the one you&apos;re recovering from)
+              </span>
+              <input
+                value={outputDir}
+                onChange={(e) => setOutputDir(e.target.value)}
+                placeholder="/home/you/recovered"
+                className="data w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              />
+            </label>
+
+            <Button onClick={startDeepScan} loading={busy === "starting"} disabled={!deepScanAvailable}>
+              <Sparkles size={15} /> Start deep scan &amp; recover
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {mode === "deep" && deepJobId && (
+        <DeepScanProgress job={deepJob} running={deepRunning} onCancel={cancelDeepScan} onNewScan={newDeepScan} />
+      )}
+
       {error && <ErrorState message={error} />}
       {result && <RestoreResultView result={result} />}
+    </div>
+  );
+}
+
+function DeepScanProgress({
+  job,
+  running,
+  onCancel,
+  onNewScan,
+}: {
+  job: RecoveryJobProgress | null;
+  running: boolean;
+  onCancel: () => void;
+  onNewScan: () => void;
+}) {
+  const succeeded = job?.status === "completed" && job.recovered > 0;
+  const done = job ? RECOVERY_JOB_TERMINAL.includes(job.status) : false;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Deep scan"
+        icon={<Sparkles size={16} />}
+        action={
+          job ? (
+            <Badge tone={succeeded ? "success" : job.status === "failed" ? "danger" : job.status === "cancelled" ? "warning" : "info"}>
+              {job.status}
+            </Badge>
+          ) : undefined
+        }
+      />
+      <div className="space-y-4 p-5">
+        {!job && <Spinner label="Starting deep scan…" />}
+
+        {job && (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-fg-muted">
+                <DataValue className="text-fg">{formatBytes(job.bytes_processed)}</DataValue> /{" "}
+                <DataValue className="text-fg">{formatBytes(job.total_bytes)}</DataValue> scanned
+              </span>
+              {job.percent != null && <DataValue className="font-medium text-fg">{job.percent.toFixed(1)}%</DataValue>}
+            </div>
+            <ProgressBar percent={job.percent ?? 0} tone={job.status === "failed" ? "danger" : "primary"} />
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <Stat label="Rate" value={`${formatBytes(job.rate_bytes_per_sec)}/s`} />
+              <Stat label="Found so far" value={String(job.recovered)} />
+              <Stat label="ETA" value={formatDuration(job.eta_seconds)} />
+            </div>
+
+            {!done && (
+              <div className="flex justify-end border-t border-border pt-4">
+                <Button variant="danger" size="sm" onClick={onCancel}>
+                  <Ban size={15} /> Cancel deep scan
+                </Button>
+              </div>
+            )}
+
+            {done && (
+              <div className="space-y-3 border-t border-border pt-4 text-sm">
+                {job.error && <div className="text-danger">{job.error}</div>}
+                {succeeded && (
+                  <p className="text-fg-muted">
+                    Recovered {job.recovered} file{job.recovered === 1 ? "" : "s"} to{" "}
+                    <DataValue className="text-fg">{job.output_dir}</DataValue>. Open that folder to check
+                    them.
+                  </p>
+                )}
+                {job.recovered_files.length > 0 && (
+                  <div className="max-h-64 overflow-auto rounded-lg border border-border bg-surface-2/50 p-3">
+                    {job.recovered_files.map((f, i) => (
+                      <div key={i} className="data text-xs text-fg-muted">
+                        {f}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <Button variant="secondary" size="sm" onClick={onNewScan}>
+                    Start another scan
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-2/50 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-fg-subtle">{label}</div>
+      <DataValue className="mt-0.5 block font-medium text-fg">{value}</DataValue>
     </div>
   );
 }

@@ -390,7 +390,33 @@ def recover(partition, output, deep, recover_all, filesystem):
             console.print("[red]PhotoRec is not installed (package: testdisk).[/red]")
             sys.exit(1)
         console.print(f"[blue]Deep-scanning {partition} with PhotoRec…[/blue]")
-        result = deep_scan_recover(partition, output)
+
+        from rich.progress import (
+            Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn,
+        )
+
+        progress_bar = Progress(
+            TextColumn("[cyan]{task.description}"),
+            BarColumn(bar_width=40, complete_style="green", finished_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        )
+        task_id = progress_bar.add_task("Scanning…", total=100)
+
+        def on_progress(payload):
+            percent = payload.get("percent")
+            if percent is not None:
+                progress_bar.update(task_id, completed=percent)
+            recovered = payload.get("recovered")
+            if recovered is not None:
+                progress_bar.update(task_id, description=f"Found {recovered} file(s)…")
+
+        with progress_bar:
+            result = deep_scan_recover(partition, output, progress_callback=on_progress)
+            progress_bar.update(task_id, completed=100)
+
         if result.refused:
             console.print(f"[red]Refused:[/red] {result.refusal_reason}")
             sys.exit(1)

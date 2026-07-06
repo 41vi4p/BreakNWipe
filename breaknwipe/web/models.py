@@ -135,12 +135,17 @@ class RecoveryScanRequest(BaseModel):
 
 
 class RecoveryRestoreRequest(BaseModel):
-    """Request to recover selected deleted files to an output folder on a different device."""
+    """Request to recover selected deleted files (by inode, via icat) to an output folder on a different device."""
     partition: str = Field(..., description="Partition to recover from, e.g. /dev/sdb1")
     output_dir: str = Field(..., description="Folder to write recovered files to (must be on a different device)")
     inodes: List[str] = Field(default_factory=list, description="Metadata addresses of files to recover (from a scan)")
-    deep_scan: bool = Field(default=False, description="Use signature-based carving (PhotoRec) instead of inode undelete")
     filesystem: Optional[str] = Field(default=None, description="Override auto-detected filesystem type")
+
+
+class RecoveryDeepScanStartRequest(BaseModel):
+    """Request to start a background deep-scan (PhotoRec) recovery job."""
+    partition: str = Field(..., description="Partition or device to scan, e.g. /dev/sdb1")
+    output_dir: str = Field(..., description="Folder to carve recovered files into (must be on a different device)")
 
 
 class WipeRequest(BaseModel):

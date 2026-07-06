@@ -26,9 +26,10 @@ from .models import (
     ApiResponse, DeviceInfo, WipeRequest, WipeSession, WipeProgress,
     WebSocketMessage, WipeSessionStatus, PartitionModel, DeviceHealthModel,
     FsckCheckRequest, PartitionResizeRequest, LvExtendRequest,
-    RecoveryScanRequest, RecoveryRestoreRequest
+    RecoveryScanRequest, RecoveryRestoreRequest, RecoveryDeepScanStartRequest
 )
 from .session_manager import WipeSessionManager
+from .recovery_manager import RecoverySessionManager
 from ..device.filesystem import list_partitions
 from ..device.health import get_device_health
 from ..device.fsck import FilesystemChecker
@@ -49,7 +50,9 @@ class WebServer:
             version="1.0.0"
         )
         self.session_manager = WipeSessionManager()
+        self.recovery_manager = RecoverySessionManager()
         self.websocket_connections: Dict[str, List[WebSocket]] = {}
+        self.recovery_ws_connections: Dict[str, List[WebSocket]] = {}
         self.event_loop = None
         self._setup_app()
 
@@ -286,21 +289,59 @@ class WebServer:
 
         @self.app.post("/api/recovery/restore")
         def recovery_restore_endpoint(request: RecoveryRestoreRequest):
-            """Recover selected files (icat) or deep-carve (photorec) to a folder
-            on a DIFFERENT device -- enforced in recovery.* so the client cannot
-            overwrite the data it's recovering."""
+            """Recover selected files by inode (icat) to a folder on a DIFFERENT
+            device -- enforced in recovery.recover_files so the client cannot
+            overwrite the data it's recovering. This is synchronous because
+            icat extraction of a handful of selected files is fast; a full
+            deep scan is a background job (see /api/recovery/deep-scan/start)."""
             try:
-                from ..device.recovery import recover_files, deep_scan_recover
-                if request.deep_scan:
-                    result = deep_scan_recover(request.partition, request.output_dir)
-                else:
-                    result = recover_files(
-                        request.partition, request.inodes, request.output_dir, request.filesystem
-                    )
+                from ..device.recovery import recover_files
+                result = recover_files(
+                    request.partition, request.inodes, request.output_dir, request.filesystem
+                )
                 return JSONResponse(content=result.to_dict())
             except Exception:
                 logger.exception(f"Recovery restore failed for {request.partition}")
                 raise HTTPException(status_code=500, detail="Recovery restore failed. See server logs for details.")
+
+        @self.app.post("/api/recovery/deep-scan/start")
+        def recovery_deep_scan_start_endpoint(request: RecoveryDeepScanStartRequest):
+            """Start a deep (PhotoRec) recovery scan as a background job and
+            return its job_id immediately. Progress streams over
+            WS /ws/recovery/{job_id}; GET /api/recovery/deep-scan/{job_id} polls
+            the same state for reconnects."""
+            try:
+                job_id = self.recovery_manager.start_deep_scan(request.partition, request.output_dir)
+
+                def progress_callback(payload: Dict[str, Any]):
+                    try:
+                        if self.event_loop and not self.event_loop.is_closed():
+                            asyncio.run_coroutine_threadsafe(
+                                self._broadcast_recovery_progress(job_id, payload), self.event_loop
+                            )
+                    except Exception as e:
+                        logger.debug(f"Failed to broadcast recovery progress: {e}")
+
+                self.recovery_manager.add_progress_callback(job_id, progress_callback)
+                return JSONResponse(content={"job_id": job_id})
+            except Exception:
+                logger.exception(f"Failed to start deep scan for {request.partition}")
+                raise HTTPException(status_code=500, detail="Failed to start deep scan. See server logs for details.")
+
+        @self.app.get("/api/recovery/deep-scan/{job_id}")
+        def recovery_deep_scan_status_endpoint(job_id: str):
+            """Current state of a deep-scan job -- used to reconnect after
+            navigating away, same pattern as GET /api/wipe/sessions."""
+            job = self.recovery_manager.get_job(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="Recovery job not found.")
+            return JSONResponse(content=job.to_dict())
+
+        @self.app.post("/api/recovery/deep-scan/{job_id}/cancel")
+        def recovery_deep_scan_cancel_endpoint(job_id: str):
+            """Stop a running deep scan early."""
+            ok = self.recovery_manager.cancel_job(job_id)
+            return JSONResponse(content={"success": ok})
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):
@@ -691,6 +732,40 @@ class WebServer:
                     except ValueError:
                         pass
 
+        @self.app.websocket("/ws/recovery/{job_id}")
+        async def recovery_websocket_endpoint(websocket: WebSocket, job_id: str):
+            """WebSocket endpoint for deep-scan recovery job progress."""
+            await websocket.accept()
+
+            if job_id not in self.recovery_ws_connections:
+                self.recovery_ws_connections[job_id] = []
+            self.recovery_ws_connections[job_id].append(websocket)
+
+            try:
+                # Send current status immediately (covers reconnects after
+                # navigating away, same as the wipe WebSocket above).
+                job = self.recovery_manager.get_job(job_id)
+                if job:
+                    message = WebSocketMessage(type="recovery_progress", session_id=job_id, data=job.to_dict())
+                    await websocket.send_text(message.json())
+
+                while True:
+                    try:
+                        await websocket.receive_text()
+                    except WebSocketDisconnect:
+                        break
+
+            except WebSocketDisconnect:
+                pass
+            finally:
+                if job_id in self.recovery_ws_connections:
+                    try:
+                        self.recovery_ws_connections[job_id].remove(websocket)
+                        if not self.recovery_ws_connections[job_id]:
+                            del self.recovery_ws_connections[job_id]
+                    except ValueError:
+                        pass
+
         @self.app.get("/api/health")
         async def health_check():
             """Health check endpoint."""
@@ -796,6 +871,26 @@ class WebServer:
         for client in disconnected_clients:
             try:
                 self.websocket_connections[session_id].remove(client)
+            except ValueError:
+                pass
+
+    async def _broadcast_recovery_progress(self, job_id: str, data: Dict[str, Any]):
+        """Broadcast a deep-scan recovery job's progress to connected WebSocket clients."""
+        if job_id not in self.recovery_ws_connections:
+            return
+
+        message = WebSocketMessage(type="recovery_progress", session_id=job_id, data=data)
+
+        disconnected_clients = []
+        for websocket in self.recovery_ws_connections[job_id]:
+            try:
+                await websocket.send_text(message.json())
+            except Exception:
+                disconnected_clients.append(websocket)
+
+        for client in disconnected_clients:
+            try:
+                self.recovery_ws_connections[job_id].remove(client)
             except ValueError:
                 pass
 

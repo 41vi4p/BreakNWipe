@@ -276,9 +276,27 @@ export interface RecoveryRestoreRequest {
   partition: string;
   output_dir: string;
   inodes?: string[];
-  deep_scan?: boolean;
   filesystem?: string | null;
 }
+
+export type RecoveryJobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export interface RecoveryJobProgress {
+  job_id: string;
+  partition: string;
+  output_dir: string;
+  status: RecoveryJobStatus;
+  percent: number | null;
+  bytes_processed: number;
+  total_bytes: number;
+  rate_bytes_per_sec: number;
+  eta_seconds: number | null;
+  recovered: number;
+  recovered_files: string[];
+  error: string | null;
+}
+
+export const RECOVERY_JOB_TERMINAL = ["completed", "failed", "cancelled"];
 
 // ---- Endpoints ----
 
@@ -314,6 +332,12 @@ export const api = {
     request<RecoveryScanResult>("/api/recovery/scan", { method: "POST", body: JSON.stringify(body) }),
   recoveryRestore: (body: RecoveryRestoreRequest) =>
     request<RecoveryRestoreResult>("/api/recovery/restore", { method: "POST", body: JSON.stringify(body) }),
+  recoveryDeepScanStart: (body: { partition: string; output_dir: string }) =>
+    request<{ job_id: string }>("/api/recovery/deep-scan/start", { method: "POST", body: JSON.stringify(body) }),
+  recoveryDeepScanStatus: (jobId: string) =>
+    request<RecoveryJobProgress>(`/api/recovery/deep-scan/${jobId}`),
+  recoveryDeepScanCancel: (jobId: string) =>
+    request<{ success: boolean }>(`/api/recovery/deep-scan/${jobId}/cancel`, { method: "POST" }),
   reports: () => request<Record<string, unknown>>("/api/reports"),
   systemInfo: () => request<Record<string, string>>("/api/system-info"),
 };
