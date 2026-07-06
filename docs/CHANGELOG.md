@@ -4,6 +4,25 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.8.0] - 2026-07-07
+
+### Added
+- **In-GUI Help & documentation page** (`/help`, reachable from a new Help icon in the top bar's
+  secondary group). One page, with a sticky section nav, covering: getting started (install
+  commands, launch modes, the root requirement); step-by-step usage guides for all four pillars
+  (Wipe's category→algorithm→confirm flow, Recover's quick-vs-deep scan and same-device refusal,
+  Verify's depths and read-only sampling, Disk Utility's health/partition-map/fsck/hex-viewer
+  panels); certificates/blockchain-anchoring/QR-verification and the audit log; a full algorithm
+  reference **rendered from `lib/algorithms.ts`** (the same data the Wipe picker uses, so the help
+  page can't drift from what the GUI actually offers); a complete CLI reference documenting every
+  command (`wipe`, `info`, `fsck`, `resize`, `recover`, `verify`, `list-algorithms`,
+  `verify-certificate`, `batch`) with option tables and copyable examples — `batch` and
+  `verify-certificate` honestly badged "in progress" since their implementations are stubs, and the
+  REA family noted as GUI-only since the CLI `wipe --algorithm` choice list doesn't include it; and
+  a 15-question FAQ (why root, algorithm choice, SSD multi-pass myths, recovery-after-wipe honesty,
+  same-device output refusal, certificate verification flow, safety gates, REA, remote GUI access
+  caveat, HPA/DCO, update/uninstall).
+
 ## [3.7.3] - 2026-07-07
 
 ### Fixed

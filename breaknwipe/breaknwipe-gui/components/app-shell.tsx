@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Trash2, FileSearch, ShieldCheck, HardDrive, ScrollText, FileCheck2, Info } from "lucide-react";
+import { Trash2, FileSearch, ShieldCheck, HardDrive, ScrollText, FileCheck2, Info, CircleHelp } from "lucide-react";
 import { ThemeToggle } from "./theme";
 
 type Tint = "danger" | "info" | "success" | "primary";
@@ -31,6 +31,7 @@ const TINT_ACTIVE: Record<Tint, string> = {
 const SECONDARY = [
   { href: "/logs/", label: "Audit log", icon: ScrollText },
   { href: "/reports/", label: "Reports", icon: FileCheck2 },
+  { href: "/help/", label: "Help", icon: CircleHelp },
   { href: "/about/", label: "About", icon: Info },
 ];
 

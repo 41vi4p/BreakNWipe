@@ -13,7 +13,7 @@ Developed by CodeBreakers Team:
 - Anastasia Lopes
 """
 
-__version__ = '3.7.3'
+__version__ = '3.8.0'
 __author__ = 'CodeBreakers Team'
 __email__ = 'contact@breaknwipe.org'
 __license__ = 'GPL-3.0-or-later'
