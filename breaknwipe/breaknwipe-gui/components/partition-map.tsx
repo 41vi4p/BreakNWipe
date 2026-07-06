@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { HardDrive, Maximize2, Minimize2, MoveHorizontal, ShieldAlert, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { ExternalLink, HardDrive, Maximize2, Minimize2, MoveHorizontal, ShieldAlert, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { api, type DiskLayout, type DiskPartitionGeom, type ResizePlan, type ResizeResult } from "@/lib/api";
+import { useAsync } from "@/lib/hooks";
 import { formatBytes } from "@/lib/format";
 import { Badge, Button, Card, CardHeader, DataValue, ErrorState } from "./ui";
 import { Dialog } from "./dialog";
@@ -116,6 +117,8 @@ export function PartitionMap({ layout, onChanged }: { layout: DiskLayout; onChan
             This disk uses LVM. After growing a physical-volume partition, extend the logical volume to use the space.
           </div>
         )}
+
+        <GpartedCallout />
       </div>
 
       {dialog && (
@@ -128,6 +131,47 @@ export function PartitionMap({ layout, onChanged }: { layout: DiskLayout; onChan
         />
       )}
     </Card>
+  );
+}
+
+function GpartedCallout() {
+  const { data } = useAsync(() => api.gpartedAvailable().catch(() => ({ available: false })), []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!data) return null; // still loading -- avoid a flash of the "not installed" state
+
+  async function openGparted() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.gpartedLaunch();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-2/50 px-4 py-3">
+      <div>
+        <div className="text-sm font-medium text-fg">Need more advanced operations?</div>
+        <div className="text-xs text-fg-muted">
+          {data.available
+            ? "GParted covers partition types, complex multi-partition layouts, and more than BreakNWipe's own tools do."
+            : "GParted covers partition types, complex multi-partition layouts, and more. Install it to use it here."}
+        </div>
+        {error && <div className="mt-1 text-xs text-danger">{error}</div>}
+      </div>
+      {data.available ? (
+        <Button variant="secondary" size="sm" onClick={openGparted} loading={busy}>
+          <ExternalLink size={14} /> Open GParted
+        </Button>
+      ) : (
+        <DataValue className="shrink-0 text-xs text-fg-subtle">sudo apt install gparted</DataValue>
+      )}
+    </div>
   );
 }
 

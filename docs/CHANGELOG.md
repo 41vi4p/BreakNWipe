@@ -4,6 +4,25 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.6.0] - 2026-07-06
+
+### Added
+- **"Open GParted" escape hatch in Disk Utility.** BreakNWipe's own partition tools (grow/shrink/move)
+  deliberately don't try to cover everything a partition editor can do (changing partition types,
+  complex multi-partition layouts, etc.) — a callout on the partition map now offers to launch GParted
+  directly for those cases, via `GET /api/utility/gparted` (availability check) and
+  `POST /api/utility/gparted/launch` (fire-and-forget `subprocess.Popen`, since GParted is a separate
+  desktop process BreakNWipe doesn't need to track). Shows an install hint (`sudo apt install gparted`)
+  when it isn't present instead of hiding the option outright. Only works when the server has a
+  graphical session to launch into (the normal case: `sudo breaknwipe --gui` started from the user's
+  own desktop terminal, which is how this app is meant to run).
+- Landing-page hero polish: removed a confusing Easter egg (the literal bytes `0f 9d 63` — the hex
+  code of the brand's primary color — were hardcoded and highlighted in the decorative background
+  texture *and* repeated in a foreground badge with unclear copy, visually colliding). Replaced with
+  a slow-drifting ambient glow, dual scan lines sweeping the hex-dump texture on staggered loops, a
+  periodic byte-flicker effect (simulating live reads, client-side only so there's no hydration
+  mismatch), and a staggered fade-in for the hero copy and pillar tiles on load.
+
 ## [3.5.0] - 2026-07-06
 
 ### Added

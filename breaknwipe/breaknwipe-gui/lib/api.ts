@@ -363,6 +363,8 @@ export const api = {
     request<ResizePlan>("/api/partition/resize", { method: "POST", body: JSON.stringify({ ...body, dry_run: true }) }),
   partitionResizeApply: (body: ResizeRequest) =>
     request<ResizeResult>("/api/partition/resize", { method: "POST", body: JSON.stringify({ ...body, dry_run: false }) }),
+  gpartedAvailable: () => request<{ available: boolean }>("/api/utility/gparted"),
+  gpartedLaunch: () => request<{ success: boolean }>("/api/utility/gparted/launch", { method: "POST" }),
   wipeStart: (body: WipeStartRequest) =>
     request<ApiResponse>("/api/wipe/start", { method: "POST", body: JSON.stringify(body) }),
   wipeStatus: (sessionId: string) => request<WipeSessionSummary>(`/api/wipe/status/${sessionId}`),

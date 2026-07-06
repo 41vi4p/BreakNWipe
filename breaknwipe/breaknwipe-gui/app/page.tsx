@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, FileSearch, HardDrive, ShieldCheck, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -57,14 +58,15 @@ export default function HomePage() {
 
   return (
     <div className="relative overflow-hidden">
+      <HeroGlow />
       <HeroTexture />
 
       <div className="relative mx-auto max-w-5xl px-5 pb-16 pt-16 sm:pt-24">
         <div className="max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
+          <h1 className="hero-in text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
             Know exactly what happened to your data.
           </h1>
-          <p className="mt-4 text-lg leading-relaxed text-fg-muted">
+          <p className="hero-in mt-4 text-lg leading-relaxed text-fg-muted" style={{ animationDelay: "80ms" }}>
             BreakNWipe is a complete, open-source disk toolkit: securely erase drives with tamper-proof
             certificates, recover what was accidentally deleted, verify a drive was actually wiped clean,
             and manage disks — without the confusion of traditional tools.
@@ -73,7 +75,8 @@ export default function HomePage() {
           {devices && (
             <Link
               href="/utility/"
-              className="mt-6 inline-flex items-center gap-2 text-sm text-fg-muted transition-colors hover:text-fg"
+              className="hero-in mt-6 inline-flex items-center gap-2 text-sm text-fg-muted transition-colors hover:text-fg"
+              style={{ animationDelay: "160ms" }}
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
@@ -87,13 +90,14 @@ export default function HomePage() {
         </div>
 
         <div className="mt-12 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {PILLARS.map((p) => {
+          {PILLARS.map((p, i) => {
             const t = TINT_STYLES[p.tint];
             return (
               <Link
                 key={p.href}
                 href={p.href}
-                className={`group flex items-start gap-4 rounded-xl border border-l-4 border-border bg-surface p-5 shadow-[var(--shadow)] transition-transform hover:-translate-y-0.5 ${t.border}`}
+                style={{ animationDelay: `${220 + i * 70}ms` }}
+                className={`hero-in group flex items-start gap-4 rounded-xl border border-l-4 border-border bg-surface p-5 shadow-[var(--shadow)] transition-transform hover:-translate-y-0.5 ${t.border}`}
               >
                 <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${t.iconBg} ${t.iconFg}`}>
                   <p.icon size={20} />
@@ -114,11 +118,28 @@ export default function HomePage() {
   );
 }
 
+// A large, slow-drifting radial glow behind the hero -- pure CSS, gives the
+// page some ambient depth at rest, independent of the hex texture below it.
+function HeroGlow() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <div
+        className="hero-glow absolute -left-1/4 -top-1/4 h-[560px] w-[560px] rounded-full opacity-[0.12] blur-3xl"
+        style={{ background: "radial-gradient(circle, var(--primary), transparent 70%)" }}
+      />
+    </div>
+  );
+}
+
 // Deterministic (not Math.random) so the static-exported HTML and the client
 // hydration render identical bytes -- a decorative hex dump, the product's own
 // visual language (this is what the hex viewer actually looks like scanning a
-// drive). A soft highlight bar sweeps down through it on a loop, standing in
-// for "actively being scanned" -- purely ambient, no literal bytes called out.
+// drive). Two soft highlight bars sweep down through it on staggered loops,
+// standing in for "actively being scanned"; a handful of bytes also flicker
+// to a fresh value every so often, like live reads -- both purely ambient,
+// no literal bytes called out. The flicker set is only ever populated from an
+// effect (after mount), so the server-rendered/initial-hydration markup is
+// identical either way -- no hydration mismatch from the randomness.
 function pseudoByte(i: number): string {
   const v = (i * 2654435761) >>> 24;
   return v.toString(16).padStart(2, "0");
@@ -127,11 +148,31 @@ function pseudoByte(i: number): string {
 function HeroTexture() {
   const cols = 18;
   const rows = 10;
+  const total = cols * rows;
+
+  const [hot, setHot] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const next = new Set<number>();
+      const count = 2 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) {
+        next.add(Math.floor(Math.random() * total));
+      }
+      setHot(next);
+    }, 1500);
+    return () => clearInterval(id);
+  }, [total]);
 
   const rowEls = Array.from({ length: rows }, (_, r) => {
-    const cells = Array.from({ length: cols }, (_, c) => (
-      <span key={c}>{pseudoByte(r * cols + c)} </span>
-    ));
+    const cells = Array.from({ length: cols }, (_, c) => {
+      const idx = r * cols + c;
+      return (
+        <span key={c} className={`transition-colors duration-700 ${hot.has(idx) ? "text-primary" : ""}`}>
+          {pseudoByte(idx)}{" "}
+        </span>
+      );
+    });
     return (
       <div key={r} className="whitespace-pre">
         {cells}
@@ -144,8 +185,9 @@ function HeroTexture() {
       aria-hidden
       className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[260px] select-none overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]"
     >
-      <div className="data text-[13px] leading-[1.9] text-fg-subtle/[0.12]">{rowEls}</div>
+      <div className="data text-[13px] leading-[1.9] text-fg-subtle/[0.14]">{rowEls}</div>
       <div className="hero-scan absolute inset-x-0 h-16 bg-gradient-to-b from-transparent via-primary/[0.09] to-transparent" />
+      <div className="hero-scan-2 absolute inset-x-0 h-12 bg-gradient-to-b from-transparent via-info/[0.07] to-transparent" />
     </div>
   );
 }

@@ -312,6 +312,44 @@ class WebServer:
                 logger.exception(f"LV extend failed for {request.lv_path}")
                 raise HTTPException(status_code=500, detail="LV extend failed. See server logs for details.")
 
+        @self.app.get("/api/utility/gparted")
+        def gparted_available_endpoint():
+            """Whether GParted is installed -- drives whether the Disk Utility
+            page offers it as an escape hatch for operations BreakNWipe's own
+            partition tools don't cover (partition types, complex multi-disk
+            layouts, etc.)."""
+            import shutil
+            return JSONResponse(content={"available": bool(shutil.which("gparted"))})
+
+        @self.app.post("/api/utility/gparted/launch")
+        def gparted_launch_endpoint():
+            """Launch GParted as a separate desktop process. Fire-and-forget:
+            BreakNWipe's own server keeps running regardless of what GParted
+            does. Requires a graphical session -- this only works when
+            `sudo breaknwipe --gui` was started from the user's own desktop
+            (the usual way this app runs), since GParted needs the same
+            DISPLAY/XAUTHORITY the server process inherited."""
+            import shutil
+            import subprocess
+
+            gparted_path = shutil.which("gparted")
+            if not gparted_path:
+                raise HTTPException(status_code=404, detail="GParted is not installed (package: gparted).")
+
+            try:
+                subprocess.Popen(
+                    [gparted_path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except OSError as e:
+                logger.exception("Failed to launch GParted")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Could not launch GParted ({e}). Try running 'sudo gparted' from a terminal instead.",
+                )
+            return JSONResponse(content={"success": True})
+
         # ---- File recovery (sync handlers -> thread pool; blocking subprocess) ----
 
         @self.app.get("/api/recovery/available")
