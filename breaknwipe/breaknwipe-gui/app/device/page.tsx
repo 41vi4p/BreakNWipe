@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2, Binary, FileSearch } from "lucide-react";
 import { api } from "@/lib/api";
@@ -10,6 +11,14 @@ import { PartitionMap } from "@/components/partition-map";
 import { FsckPanel } from "@/components/fsck-panel";
 
 export default function DevicePage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <DevicePageInner />
+    </Suspense>
+  );
+}
+
+function DevicePageInner() {
   const path = useQueryParam("path");
 
   const devices = useAsync(() => api.devices(), []);
@@ -27,8 +36,8 @@ export default function DevicePage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Link href="/" className="mb-2 inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg">
-            <ArrowLeft size={15} /> Devices
+          <Link href="/utility/" className="mb-2 inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg">
+            <ArrowLeft size={15} /> Disk Utility
           </Link>
           <PageTitle title={device?.model || "Device"} />
           <DataValue className="-mt-4 block text-sm text-fg-muted">{path}</DataValue>

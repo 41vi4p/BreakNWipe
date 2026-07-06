@@ -113,6 +113,12 @@ class FsckCheckRequest(BaseModel):
     filesystem: Optional[str] = Field(default=None, description="Override auto-detected filesystem type")
 
 
+class ErasureCheckRequest(BaseModel):
+    """Request to check whether a device has actually been wiped (read-only)."""
+    device: str = Field(..., description="Whole device to check, e.g. /dev/sdb")
+    depth: str = Field(default="comprehensive", description="One of: quick, comprehensive, paranoid")
+
+
 class PartitionResizeRequest(BaseModel):
     """Request to plan (dry-run) or apply a partition resize."""
     partition: str = Field(..., description="Partition to resize, e.g. /dev/sdb1")

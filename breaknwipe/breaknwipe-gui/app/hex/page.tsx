@@ -1,12 +1,21 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useQueryParam } from "@/lib/hooks";
-import { DataValue, ErrorState, PageTitle } from "@/components/ui";
+import { DataValue, ErrorState, PageTitle, Spinner } from "@/components/ui";
 import { HexViewer } from "@/components/hex-viewer";
 
 export default function HexPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <HexPageInner />
+    </Suspense>
+  );
+}
+
+function HexPageInner() {
   const path = useQueryParam("path");
 
   if (!path) {

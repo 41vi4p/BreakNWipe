@@ -470,6 +470,49 @@ def recover(partition, output, deep, recover_all, filesystem):
 
 
 @main.command()
+@click.argument('device', shell_complete=complete_device_path)
+@click.option('--depth', type=click.Choice(['quick', 'comprehensive', 'paranoid']), default='comprehensive',
+              help='How thoroughly to sample the device (default: comprehensive)')
+def verify(device, depth):
+    """Check whether a DEVICE has actually been wiped -- no data should remain.
+
+    Read-only: samples the raw device for leftover data (entropy, repeated
+    patterns, known file-format signatures) and, if any filesystem is still
+    recognizable, cross-checks that nothing is recoverable by name. Never
+    writes to the device.
+    """
+    from ..device.erasure_check import check_erasure
+
+    console.print(f"[blue]Checking erasure of {device} ({depth})…[/blue]")
+    result = check_erasure(device, depth)
+
+    if result.refused:
+        console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+        sys.exit(1)
+    if result.error:
+        console.print(f"[red]{result.error}[/red]")
+        sys.exit(1)
+
+    if result.passed:
+        console.print("[green]✓ No recoverable data found -- this device appears properly erased.[/green]")
+    else:
+        console.print("[red]✗ This device does NOT appear to be fully erased.[/red]")
+
+    console.print(f"Samples checked: {result.samples_checked}  ·  Avg entropy: {result.avg_entropy:.2f}/8  ·  "
+                  f"Pattern detections: {result.pattern_detection_percent:.1f}%")
+    if result.signature_hits:
+        sigs = ', '.join(h['signature'] for h in result.signature_hits)
+        console.print(f"[yellow]File signatures found:[/yellow] {sigs}")
+    for note in result.notes:
+        console.print(f"[dim]· {note}[/dim]")
+    for pc in result.partition_checks:
+        console.print(f"[dim]  {pc.partition}: {pc.note}[/dim]")
+
+    if not result.passed:
+        sys.exit(1)
+
+
+@main.command()
 def list_algorithms():
     """List all available wiping algorithms."""
 

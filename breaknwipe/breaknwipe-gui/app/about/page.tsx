@@ -1,12 +1,14 @@
 "use client";
 
-import { ShieldCheck, HardDrive, HeartPulse, Wrench, Move, Trash2, FileCheck2, ExternalLink } from "lucide-react";
+import { ShieldCheck, HardDrive, HeartPulse, Wrench, Move, Trash2, FileCheck2, FileSearch, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { Card, CardHeader, DataValue, PageTitle, Spinner } from "@/components/ui";
 
 const CAPABILITIES = [
   { icon: Trash2, title: "Secure wipe", body: "NIST/DoD/Gutmann + REA crypto-erase, with read-back verification and signed, blockchain-anchored certificates of destruction." },
+  { icon: FileSearch, title: "File recovery", body: "Undelete files by name (NTFS/FAT/exFAT) or deep-carve by content (PhotoRec, any filesystem) — with live progress and in-GUI preview." },
+  { icon: ShieldCheck, title: "Verify", body: "Confirm a device has actually been wiped — samples the raw drive for leftover data and cross-checks against the recovery scan, read-only." },
   { icon: HeartPulse, title: "Drive health", body: "SMART status, temperature, power-on hours, and an honest remaining-lifespan estimate where a reliable indicator exists." },
   { icon: HardDrive, title: "Partitions", body: "Browse partitions and free space on any disk, with filesystem types and mount state." },
   { icon: Wrench, title: "Filesystem repair", body: "Check and repair ext/FAT/exFAT/NTFS/XFS/Btrfs — never auto-unmounting, always safe by default." },

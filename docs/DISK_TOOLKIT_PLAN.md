@@ -74,6 +74,25 @@ folder is on the source device). Honest framing: a fully-wiped drive is unrecove
 UI. `GET /api/recovery/available`, `POST /api/recovery/scan`, `POST /api/recovery/restore`; `/recover`
 GUI page; `breaknwipe recover` CLI command. Adds `sleuthkit` + `testdisk` deps.
 
+### Phase 5 — Progress/ETA, file browsing, real Verify, and a GUI redesign ✅ shipped (v3.4.0)
+Follow-on polish after the four phases above landed: deep-scan recovery gained live progress + ETA
+(`/proc/<pid>/io` polling — PhotoRec has no scripted progress API and doesn't move its fd offset, so
+`fdinfo/pos` is useless) via a new `RecoverySessionManager` background-job pattern (mirrors
+`WipeSessionManager`) streamed over `WS /ws/recovery/{job_id}`; recovered files became browsable and
+previewable in-GUI (`GET /api/recovery/view`, restricted to folders a recovery operation actually
+wrote to — the client never supplies a root); and a real **Verify** feature was built — confirms a
+*device* has actually been wiped clean (not certificate authenticity): `device/erasure_check.py`
+combines `WipeVerifier.verify_wipe_detailed()` (entropy/pattern/file-signature sampling of the raw
+device) with a best-effort recovery cross-check on any still-recognizable filesystem. Fixed a real
+bug found along the way: `verification.py`'s file-signature byte literals were double-escaped and had
+never actually matched real binary data. Alongside this, the GUI's IA was redone: a proper landing
+page (hero + four color-coded pillar actions) replaced the old device-list-as-homepage, navigation
+became a horizontal top bar with those same four pillars as tabs, and `/wipe`/`/recover`/`/verify`/
+`/utility` each gained their own in-flow device picker so no pillar assumes a device was already
+chosen elsewhere. (A separate `POST /api/verify/certificate` signature/blockchain-check endpoint was
+also built but is intentionally not linked from the GUI nav — it verifies certificate authenticity,
+a different concern from the Verify pillar's device-erasure check.)
+
 ## Cross-cutting
 
 - **Versioning** per project policy (bump `breaknwipe/__init__.py` + `pyproject.toml`, changelog,

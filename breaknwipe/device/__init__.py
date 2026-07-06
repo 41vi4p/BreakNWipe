@@ -32,6 +32,7 @@ from .recovery import (
     recover_files,
     deep_scan_recover,
 )
+from .erasure_check import ErasureCheckResult, PartitionRecoveryCheck, check_erasure
 
 __all__ = [
     'DeviceDetector',
@@ -65,4 +66,7 @@ __all__ = [
     'scan_deleted',
     'recover_files',
     'deep_scan_recover',
+    'ErasureCheckResult',
+    'PartitionRecoveryCheck',
+    'check_erasure',
 ]

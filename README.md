@@ -6,7 +6,7 @@
 
 **A complete, approachable disk toolkit — securely wipe drives with tamper-proof certificates, inspect health, manage partitions, and repair filesystems, all from one clean interface.**
 
-[![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.4.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -114,7 +114,8 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 - [x] **Filesystem repair (fsck)** — checks (and, with `--repair`, fixes) ext2/3/4, FAT/exFAT, NTFS, XFS, and Btrfs filesystems, with a safety model that never auto-unmounts and gates repairing system/Btrfs filesystems behind `--force`. Available as `breaknwipe fsck <partition>` and from each device's web GUI details page.
 - [x] **Partition resize** — grow into free space (**live** for ext4/XFS/Btrfs — extend your root partition without a live USB), shrink, and move, plus the one-step "my VM/root disk grew but the partition didn't" fix (`growpart` + filesystem grow, or LVM `lvextend`). Interactive partition map in the GUI and a `breaknwipe resize` CLI command — both **preview the exact commands** before running and require typed confirmation; shrink/move are offline-only and never auto-unmount.
 - [x] **Hex / sector viewer** — read-only view of raw device bytes (hex + ASCII, sector boundaries, jump-to-offset) in the web GUI, wired into the post-wipe screen so you can *see* a drive is actually zeroed.
-- [x] **Deleted-file recovery** — undelete accidentally-deleted or quick-formatted files. A *quick scan* (The Sleuth Kit) recovers files **with their original names** on NTFS/FAT/exFAT (USB sticks, SD cards, Windows drives); a *deep scan* (PhotoRec) carves file contents by type even from ext4 or damaged drives. Simple browse-and-select GUI at `/recover`, a `breaknwipe recover <partition>` CLI command, and an honest reminder that a securely-wiped drive has nothing to recover. Recovery always writes to a **different** drive so it can't overwrite what it's reading.
+- [x] **Deleted-file recovery** — undelete accidentally-deleted or quick-formatted files. A *quick scan* (The Sleuth Kit) recovers files **with their original names** on NTFS/FAT/exFAT (USB sticks, SD cards, Windows drives); a *deep scan* (PhotoRec) carves file contents by type even from ext4 or damaged drives, with live progress/ETA and in-GUI preview of what came back. Simple browse-and-select GUI at `/recover`, a `breaknwipe recover <partition>` CLI command, and an honest reminder that a securely-wiped drive has nothing to recover. Recovery always writes to a **different** drive so it can't overwrite what it's reading.
+- [x] **Verify erasure** — confirm a device has actually been wiped clean: read-only sampling of the raw drive (entropy, repeated patterns, known file signatures) at quick/comprehensive/paranoid depth, plus a cross-check against the recovery scan. `/verify` in the GUI and `breaknwipe verify <device>` on the CLI.
 
 #### Certification & Verification
 - [x] **Digitally signed PDF certificates** (RSA / X.509)
@@ -127,7 +128,7 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 #### User Interfaces
 - [x] **Interactive CLI wizard** for beginners (`--interactive`)
 - [x] **Expert CLI mode** with full command-line control
-- [x] **Modern web GUI** — a Next.js + React interface (light & dark themes) served by the FastAPI backend, with real-time WebSocket progress; covers wipe, health, partitions, and filesystem repair (`--gui`)
+- [x] **Modern web GUI** — a Next.js + React interface (light & dark themes) served by the FastAPI backend, with real-time WebSocket progress. A clean landing page opens into four pillars — **Wipe**, **Recover**, **Verify**, **Disk Utility** (health, partitions, repair, hex) — each with its own device picker rather than one shared dashboard (`--gui`)
 - [x] **Batch processing** of multiple devices from a config file
 - [x] `.deb` / `.rpm` package build scripts and system installer
 - [x] **Self-hosted APT repository** (GitHub Pages) — `sudo apt install breaknwipe` with real updates via `apt upgrade`
@@ -263,6 +264,7 @@ Restart your shell (or `source` the relevant rc file) afterward. To also complet
 | `fsck <partition>` | Check (and, with `--repair`, fix) a filesystem's integrity |
 | `resize <partition>` | Grow / shrink / move a partition (preview-first) |
 | `recover <partition>` | Find and recover deleted files (quick scan or `--deep` carve) |
+| `verify <device>` | Confirm a device has actually been wiped (read-only) |
 | `list-algorithms` | Show available wiping algorithms |
 | `batch` | Batch processing from a JSON/YAML config file |
 | `verify-certificate` | Verify wipe certificate authenticity |

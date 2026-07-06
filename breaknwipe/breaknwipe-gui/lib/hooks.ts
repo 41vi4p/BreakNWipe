@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 // Minimal async-data hook: runs `fn`, tracks loading/error, and exposes a
 // `reload`. `deps` controls re-fetching.
@@ -31,15 +32,18 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   return { data, error, loading, reload };
 }
 
-// Reads a query param from window.location — avoids the Suspense boundary that
-// `useSearchParams` requires under static export, and matches how the old GUI
-// passed the device path.
+// Reads a query param, reactively -- via Next's useSearchParams(), which
+// re-renders on every client-side navigation (including a same-route change
+// like /wipe/ -> /wipe/?path=X, e.g. picking a device from an in-page
+// picker). A plain window.location.search read in a mount-only effect (the
+// previous approach) misses exactly that case: App Router doesn't remount
+// the page for a search-param-only navigation, so the effect never re-runs
+// and the value gets stuck until a full page reload.
+//
+// useSearchParams() requires a Suspense boundary in a statically-exported
+// app (Next can't know the query string at build time) -- every page that
+// calls this hook wraps its content in <Suspense>.
 export function useQueryParam(key: string): string | null {
-  const [value, setValue] = useState<string | null>(null);
-  useEffect(() => {
-    // Read the query string on mount (client-only). Intentional mount sync.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setValue(new URLSearchParams(window.location.search).get(key));
-  }, [key]);
-  return value;
+  const params = useSearchParams();
+  return params.get(key);
 }

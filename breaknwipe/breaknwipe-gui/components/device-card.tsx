@@ -14,8 +14,24 @@ function DeviceIcon({ type, iface, size }: { type: string; iface: string; size: 
   return <HardDrive size={size} />;
 }
 
-export function DeviceCard({ device }: { device: DeviceInfo }) {
+export function DeviceCard({
+  device,
+  primaryLabel = "Wipe",
+  primaryHref,
+  primaryVariant = "primary",
+  secondaryLabel = "Details",
+  secondaryHref,
+}: {
+  device: DeviceInfo;
+  primaryLabel?: string;
+  primaryHref?: (path: string) => string;
+  primaryVariant?: "primary" | "danger" | "secondary";
+  secondaryLabel?: string;
+  secondaryHref?: (path: string) => string;
+}) {
   const encoded = encodeURIComponent(device.path);
+  const primary = (primaryHref ?? ((p: string) => `/wipe/?path=${p}`))(encoded);
+  const secondary = (secondaryHref ?? ((p: string) => `/device/?path=${p}`))(encoded);
 
   return (
     <div className="group flex flex-col rounded-xl border border-border bg-surface p-5 transition-colors hover:border-border-strong">
@@ -51,15 +67,15 @@ export function DeviceCard({ device }: { device: DeviceInfo }) {
       </div>
 
       <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-        <Link href={`/device/?path=${encoded}`} className="flex-1">
+        <Link href={secondary} className="flex-1">
           <Button variant="secondary" size="sm" className="w-full">
-            Details
+            {secondaryLabel}
             <ChevronRight size={15} />
           </Button>
         </Link>
-        <Link href={`/wipe/?path=${encoded}`}>
-          <Button variant="primary" size="sm">
-            Wipe
+        <Link href={primary}>
+          <Button variant={primaryVariant} size="sm">
+            {primaryLabel}
           </Button>
         </Link>
       </div>

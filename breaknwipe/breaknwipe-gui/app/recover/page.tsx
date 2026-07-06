@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   Ban,
+  File as FileIcon,
   FileSearch,
   FolderInput,
   Info,
@@ -36,14 +37,32 @@ import {
   ProgressBar,
   Spinner,
 } from "@/components/ui";
+import { DevicePicker } from "@/components/device-picker";
+import { RecoveredFileViewer } from "@/components/recovered-file-viewer";
 
 export default function RecoverPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <RecoverPageInner />
+    </Suspense>
+  );
+}
+
+function RecoverPageInner() {
   const path = useQueryParam("path");
   const partitions = useAsync(() => (path ? api.devicePartitions(path) : Promise.resolve([])), [path]);
   const availability = useAsync(() => api.recoveryAvailable(), []);
 
   if (!path) {
-    return <ErrorState message="No device given. Open a device and choose Recover files." />;
+    return (
+      <DevicePicker
+        title="Recover"
+        description="Find and restore deleted or quick-formatted files from a device — pick one to start."
+        primaryLabel="Recover"
+        primaryHref={(p) => `/recover/?path=${p}`}
+        primaryVariant="secondary"
+      />
+    );
   }
 
   return (
@@ -118,12 +137,12 @@ function RecoverTool({
   const [result, setResult] = useState<RecoveryRestoreResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deepJobId, setDeepJobId] = useState<string | null>(null);
+  const [viewerPath, setViewerPath] = useState<string | null>(null);
 
   const { last: deepLast } = useWebSocket<{ type: string; data: RecoveryJobProgress }>(
     deepJobId ? `/ws/recovery/${deepJobId}` : null,
   );
   const deepJob = deepLast?.data ?? null;
-  const deepRunning = deepJob ? !RECOVERY_JOB_TERMINAL.includes(deepJob.status) : false;
 
   const selectedPartition = partitions.find((p) => p.path === partition);
 
@@ -309,25 +328,50 @@ function RecoverTool({
       )}
 
       {mode === "deep" && deepJobId && (
-        <DeepScanProgress job={deepJob} running={deepRunning} onCancel={cancelDeepScan} onNewScan={newDeepScan} />
+        <DeepScanProgress
+          job={deepJob}
+          onCancel={cancelDeepScan}
+          onNewScan={newDeepScan}
+          onView={setViewerPath}
+        />
       )}
 
       {error && <ErrorState message={error} />}
-      {result && <RestoreResultView result={result} />}
+      {result && <RestoreResultView result={result} onView={setViewerPath} />}
+
+      <RecoveredFileViewer path={viewerPath} onOpenChange={(open) => !open && setViewerPath(null)} />
+    </div>
+  );
+}
+
+function RecoveredFileList({ files, onView }: { files: string[]; onView: (path: string) => void }) {
+  return (
+    <div className="max-h-64 overflow-auto rounded-lg border border-border bg-surface-2/50">
+      {files.map((f, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onView(f)}
+          className="flex w-full items-center gap-2 border-b border-border/60 px-3 py-2 text-left text-xs last:border-b-0 hover:bg-surface-3"
+        >
+          <FileIcon size={13} className="shrink-0 text-fg-subtle" />
+          <span className="data truncate text-fg-muted">{f}</span>
+        </button>
+      ))}
     </div>
   );
 }
 
 function DeepScanProgress({
   job,
-  running,
   onCancel,
   onNewScan,
+  onView,
 }: {
   job: RecoveryJobProgress | null;
-  running: boolean;
   onCancel: () => void;
   onNewScan: () => void;
+  onView: (path: string) => void;
 }) {
   const succeeded = job?.status === "completed" && job.recovered > 0;
   const done = job ? RECOVERY_JOB_TERMINAL.includes(job.status) : false;
@@ -383,13 +427,7 @@ function DeepScanProgress({
                   </p>
                 )}
                 {job.recovered_files.length > 0 && (
-                  <div className="max-h-64 overflow-auto rounded-lg border border-border bg-surface-2/50 p-3">
-                    {job.recovered_files.map((f, i) => (
-                      <div key={i} className="data text-xs text-fg-muted">
-                        {f}
-                      </div>
-                    ))}
-                  </div>
+                  <RecoveredFileList files={job.recovered_files} onView={onView} />
                 )}
                 <div className="flex justify-end">
                   <Button variant="secondary" size="sm" onClick={onNewScan}>
@@ -595,7 +633,13 @@ function FileTable({
   );
 }
 
-function RestoreResultView({ result }: { result: RecoveryRestoreResult }) {
+function RestoreResultView({
+  result,
+  onView,
+}: {
+  result: RecoveryRestoreResult;
+  onView: (path: string) => void;
+}) {
   if (result.refused) {
     return (
       <div className="rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm text-warning">
@@ -626,13 +670,7 @@ function RestoreResultView({ result }: { result: RecoveryRestoreResult }) {
           </p>
         )}
         {result.recovered_files.length > 0 && (
-          <div className="max-h-64 overflow-auto rounded-lg border border-border bg-surface-2/50 p-3">
-            {result.recovered_files.map((f, i) => (
-              <div key={i} className="data text-xs text-fg-muted">
-                {f}
-              </div>
-            ))}
-          </div>
+          <RecoveredFileList files={result.recovered_files} onView={onView} />
         )}
       </div>
     </Card>

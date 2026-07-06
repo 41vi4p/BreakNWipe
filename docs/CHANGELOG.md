@@ -4,6 +4,55 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.4.0] - 2026-07-06
+
+### Added
+- **Deep-scan recovery progress + ETA** — `deep_scan_recover()` now runs PhotoRec via `Popen` and polls
+  `/proc/<pid>/io`'s `read_bytes` once a second (the only externally observable progress signal in
+  PhotoRec's unattended `/cmd` mode — it doesn't move its file descriptor's offset, so
+  `/proc/<pid>/fdinfo/pos` is useless). Reports percent (clamped below 100 until the process actually
+  exits, since PhotoRec fast-skips empty/duplicate regions), rate, and ETA. A new
+  `RecoverySessionManager` (mirroring `WipeSessionManager`) runs deep scans as background jobs —
+  `POST /api/recovery/deep-scan/start` returns a `job_id` immediately, progress streams over
+  `WS /ws/recovery/{job_id}`, and the GUI's "Start deep scan & recover" now shows a live progress bar,
+  scanned-bytes counter, rate, running "found so far" count, ETA, and a Cancel button.
+- **Browse and preview recovered files from the GUI** — recovered-file lists (both quick-scan/icat and
+  deep-scan results) are now clickable; a new `GET /api/recovery/view` endpoint streams a recovered
+  file's bytes for inline preview (images, PDFs via `<iframe>`, text files) or download/"open in new
+  tab" for everything else. Only readable from folders a recovery operation actually wrote to during
+  the server's lifetime (`self.recovered_roots`) — the client supplies a file path but never a root,
+  so this can't become an arbitrary local file read.
+- **Verify pillar — confirms a device was actually wiped clean** (not certificate authenticity). Pick a
+  device and run a read-only check: statistical sampling of the raw drive (Shannon entropy, repeated-
+  pattern, and known file-signature detection, at quick/comprehensive/paranoid depth) plus a best-effort
+  recovery cross-check on any still-recognizable filesystem — no recognizable filesystem at all is
+  itself treated as a good sign, not a failure. New `breaknwipe/device/erasure_check.py`
+  (`check_erasure()`), `POST /api/verify/erasure`, and `breaknwipe verify <device>` CLI command.
+  Along the way, fixed a real bug in `wipe_engine/verification.py`'s file-signature list: the byte
+  literals were double-escaped (`b'\\x89PNG'`, seven literal ASCII characters) instead of real bytes
+  (`b'\x89PNG'`), so binary file-signature detection had never actually matched anything. Also
+  refactored `WipeVerifier` to expose a `verify_wipe_detailed()` method returning full stats (entropy,
+  pattern %, signature hits with offsets) alongside the existing bool-returning `verify_wipe()` that
+  the wipe engine's own post-wipe check already relied on.
+- A separate `POST /api/verify/certificate` endpoint (digital-signature + blockchain-anchor check via
+  `CertificateGenerator`) was built during this work but isn't linked from the GUI nav — the "Verify"
+  pillar is about erasure, not certificate authenticity. Left in place as a working API for a possible
+  future certificate-verification surface.
+- **Full GUI redesign** — replaced the generic sidebar-dashboard layout with a proper information
+  architecture: a clean landing page (`/`) with a hero and four clearly-styled pillar actions — Wipe,
+  Recover, Verify, Disk Utility (each color-coded by nature: danger/info/success/primary) — instead of
+  opening straight into a device list. Navigation is now a horizontal top bar with the four pillars as
+  primary tabs (suppressed on the landing page itself) and Logs/Reports/About tucked into compact
+  tooltip icon buttons. The old device-list landing page moved to `/utility` (the Disk Utility pillar's
+  entry point); `/wipe` and `/recover` each gained their own in-flow device picker (a new shared
+  `<DevicePicker>`/`<DeviceCard>` pairing) so every pillar is a self-contained starting point rather
+  than assuming a device was already chosen elsewhere.
+- **Fixed a latent bug**: PhotoRec writes its `photorec.log` into the *current working directory* of
+  the process (undocumented behavior, found by testing directly), not the output folder — previously
+  this could leak stray `photorec.log` files into wherever the FastAPI/CLI process's cwd happened to
+  be. `deep_scan_recover()` now runs PhotoRec with `cwd=output_dir` and excludes `photorec.log` from
+  the recovered-files count.
+
 ## [3.3.0] - 2026-07-06
 
 Phase 4 (final) of the disk-toolkit roadmap: **deleted-file recovery.**

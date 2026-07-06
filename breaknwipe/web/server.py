@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -26,7 +26,8 @@ from .models import (
     ApiResponse, DeviceInfo, WipeRequest, WipeSession, WipeProgress,
     WebSocketMessage, WipeSessionStatus, PartitionModel, DeviceHealthModel,
     FsckCheckRequest, PartitionResizeRequest, LvExtendRequest,
-    RecoveryScanRequest, RecoveryRestoreRequest, RecoveryDeepScanStartRequest
+    RecoveryScanRequest, RecoveryRestoreRequest, RecoveryDeepScanStartRequest,
+    ErasureCheckRequest
 )
 from .session_manager import WipeSessionManager
 from .recovery_manager import RecoverySessionManager
@@ -53,6 +54,11 @@ class WebServer:
         self.recovery_manager = RecoverySessionManager()
         self.websocket_connections: Dict[str, List[WebSocket]] = {}
         self.recovery_ws_connections: Dict[str, List[WebSocket]] = {}
+        # Folders a recovery operation has actually written to in this server's
+        # lifetime -- the only directories /api/recovery/view is allowed to read
+        # from, so browsing recovered files can't be turned into an arbitrary
+        # local file-read (the client only ever supplies a path, never a root).
+        self.recovered_roots: set = set()
         self.event_loop = None
         self._setup_app()
 
@@ -186,6 +192,19 @@ class WebServer:
                 logger.exception(f"fsck failed for {request.partition}")
                 raise HTTPException(status_code=500, detail="fsck failed. See server logs for details.")
 
+        @self.app.post("/api/verify/erasure")
+        def verify_erasure_endpoint(request: ErasureCheckRequest):
+            """Read-only check of whether a device has actually been wiped --
+            statistical sampling (entropy/pattern/file-signature) of the raw
+            device plus a best-effort recovery cross-check on any still-
+            recognizable filesystem. Never writes to the device."""
+            try:
+                from ..device.erasure_check import check_erasure
+                return JSONResponse(content=check_erasure(request.device, request.depth).to_dict())
+            except Exception:
+                logger.exception(f"Erasure check failed for {request.device}")
+                raise HTTPException(status_code=500, detail="Erasure check failed. See server logs for details.")
+
         @self.app.get("/api/devices/{device_path:path}/sectors")
         def read_sectors_endpoint(device_path: str, offset: int = 0, length: int = 512):
             """Read raw bytes from a device (read-only) for the hex/sector viewer.
@@ -299,6 +318,8 @@ class WebServer:
                 result = recover_files(
                     request.partition, request.inodes, request.output_dir, request.filesystem
                 )
+                if not result.refused:
+                    self.recovered_roots.add(os.path.realpath(request.output_dir))
                 return JSONResponse(content=result.to_dict())
             except Exception:
                 logger.exception(f"Recovery restore failed for {request.partition}")
@@ -311,6 +332,7 @@ class WebServer:
             WS /ws/recovery/{job_id}; GET /api/recovery/deep-scan/{job_id} polls
             the same state for reconnects."""
             try:
+                self.recovered_roots.add(os.path.realpath(request.output_dir))
                 job_id = self.recovery_manager.start_deep_scan(request.partition, request.output_dir)
 
                 def progress_callback(payload: Dict[str, Any]):
@@ -342,6 +364,100 @@ class WebServer:
             """Stop a running deep scan early."""
             ok = self.recovery_manager.cancel_job(job_id)
             return JSONResponse(content={"success": ok})
+
+        @self.app.get("/api/recovery/view")
+        def recovery_view_endpoint(path: str):
+            """Stream a recovered file's bytes (for the GUI's browse/preview
+            panel) or offer it for download. Only readable if it lives inside a
+            folder a recovery operation actually wrote to in this server's
+            lifetime (self.recovered_roots) -- the client supplies a file path
+            but never a root, so this can't become an arbitrary local file read."""
+            try:
+                resolved = os.path.realpath(path)
+                if not os.path.exists(resolved) or not os.path.isfile(resolved):
+                    raise HTTPException(status_code=404, detail="File not found")
+                if not any(
+                    resolved == root or resolved.startswith(root + os.sep)
+                    for root in self.recovered_roots
+                ):
+                    raise HTTPException(status_code=403, detail="Access denied")
+
+                import mimetypes
+                media_type, _ = mimetypes.guess_type(resolved)
+                return FileResponse(
+                    path=resolved, filename=os.path.basename(resolved),
+                    media_type=media_type or "application/octet-stream",
+                )
+            except HTTPException:
+                raise
+            except Exception:
+                logger.exception(f"Recovery file view failed for {path}")
+                raise HTTPException(status_code=500, detail="Could not read file. See server logs for details.")
+
+        @self.app.post("/api/verify/certificate")
+        async def verify_certificate_endpoint(file: UploadFile = File(...)):
+            """Verify a wipe certificate's digital signature (and, if the
+            certificate carries a hash, its blockchain anchor). Accepts the
+            JSON report file directly -- the browser and this server aren't
+            guaranteed to share a filesystem view, so upload is the only path
+            that always works, unlike a server-side file path."""
+            import json
+            import tempfile
+
+            try:
+                raw = await file.read()
+            except Exception:
+                raise HTTPException(status_code=400, detail="Could not read the uploaded file.")
+
+            try:
+                cert_data = json.loads(raw)
+            except (ValueError, UnicodeDecodeError):
+                return JSONResponse(content={
+                    "valid": False, "signature_valid": False, "certificate_exists": True,
+                    "error": "Not a valid JSON certificate. Upload the .json report, not the PDF.",
+                    "report": None, "blockchain": None,
+                })
+
+            tmp_path = None
+            try:
+                with tempfile.NamedTemporaryFile(mode="wb", suffix=".json", delete=False) as tmp:
+                    tmp.write(raw)
+                    tmp_path = tmp.name
+
+                cert_generator = self.session_manager.cert_generator
+                result = cert_generator.verify_certificate(tmp_path)
+            except Exception:
+                logger.exception("Certificate verification failed")
+                raise HTTPException(status_code=500, detail="Verification failed. See server logs for details.")
+            finally:
+                if tmp_path:
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
+
+            device_info = cert_data.get("device_info") or {}
+            result["report"] = {
+                "report_id": cert_data.get("report_id"),
+                "generated_at": cert_data.get("generated_at"),
+                "algorithm_used": cert_data.get("algorithm_used"),
+                "success": cert_data.get("success"),
+                "certificate_hash": cert_data.get("certificate_hash"),
+                "device_model": device_info.get("model"),
+                "device_path": device_info.get("path"),
+                "device_serial": device_info.get("serial"),
+            }
+
+            result["blockchain"] = None
+            cert_hash = cert_data.get("certificate_hash")
+            if cert_hash:
+                try:
+                    result["blockchain"] = cert_generator.verify_certificate_blockchain(cert_hash)
+                except Exception:
+                    logger.exception("Blockchain verification failed")
+                    result["blockchain"] = {"valid": False, "error": "Blockchain lookup failed. See server logs for details."}
+
+            return JSONResponse(content=result)
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):

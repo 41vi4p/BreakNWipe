@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldAlert, Download, CheckCircle2, XCircle, Ban, Binary } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Download, CheckCircle2, XCircle, Ban, Binary, Activity } from "lucide-react";
 import { api, apiUrl, WIPE_TERMINAL, type DeviceInfo, type WipeProgressState } from "@/lib/api";
 import { ALGORITHMS, algorithmLabel } from "@/lib/algorithms";
 import { useAsync, useQueryParam } from "@/lib/hooks";
@@ -10,13 +10,24 @@ import { useWebSocket } from "@/lib/use-websocket";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { Button, Card, CardHeader, DataValue, ErrorState, PageTitle, ProgressBar, Spinner, Badge } from "@/components/ui";
 import { ConfirmDialog } from "@/components/dialog";
+import { DevicePicker } from "@/components/device-picker";
 
 type WipeProgress = WipeProgressState;
 
 export default function WipePage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <WipePageInner />
+    </Suspense>
+  );
+}
+
+function WipePageInner() {
   const path = useQueryParam("path");
   const { data: devices, loading } = useAsync(() => api.devices(), []);
   const device = devices?.find((d) => d.path === path) as DeviceInfo | undefined;
+  const { data: allSessions } = useAsync(() => api.wipeSessions().catch(() => []), []);
+  const activeWipes = (allSessions ?? []).filter((s) => !WIPE_TERMINAL.includes(s.progress.status));
 
   const [algorithm, setAlgorithm] = useState("nist-clear");
   const [passes, setPasses] = useState(3);
@@ -61,7 +72,37 @@ export default function WipePage() {
     };
   }, [path]);
 
-  if (!path) return <ErrorState message="No device path given. Open a device from Devices first." />;
+  if (!path) {
+    return (
+      <DevicePicker
+        title="Wipe"
+        description="Securely erase a device with a standards-compliant algorithm and a tamper-proof certificate of destruction."
+        primaryLabel="Wipe"
+        primaryHref={(p) => `/wipe/?path=${p}`}
+        primaryVariant="danger"
+        extra={
+          activeWipes.length > 0 ? (
+            <div className="mb-5 space-y-2">
+              {activeWipes.map((s) => (
+                <Link
+                  key={s.session_id}
+                  href={`/wipe/?path=${encodeURIComponent(s.device_info.path)}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-info/30 bg-info/8 px-4 py-3 text-sm transition-colors hover:bg-info/12"
+                >
+                  <span className="flex items-center gap-2 text-info">
+                    <Activity size={16} className="animate-pulse" />
+                    Wipe in progress on <DataValue className="text-fg">{s.device_info.path}</DataValue> ·{" "}
+                    {s.progress.progress_percent.toFixed(0)}%
+                  </span>
+                  <span className="font-medium text-info">Resume →</span>
+                </Link>
+              ))}
+            </div>
+          ) : undefined
+        }
+      />
+    );
+  }
 
   async function start() {
     if (!path) return;
@@ -267,7 +308,7 @@ export default function WipePage() {
                   <Button variant="secondary" size="sm" onClick={newWipe}>
                     Start another wipe
                   </Button>
-                  <Link href="/">
+                  <Link href="/wipe/">
                     <Button variant="ghost" size="sm">
                       Back to devices
                     </Button>

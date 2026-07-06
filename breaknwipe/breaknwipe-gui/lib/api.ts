@@ -298,6 +298,35 @@ export interface RecoveryJobProgress {
 
 export const RECOVERY_JOB_TERMINAL = ["completed", "failed", "cancelled"];
 
+// URL to stream/preview a recovered file's raw bytes (used for <img>/<iframe>
+// preview and "Open in new tab" / download links).
+export function recoveryViewUrl(path: string): string {
+  return apiUrl(`/api/recovery/view?path=${encodeURIComponent(path)}`);
+}
+
+export interface PartitionRecoveryCheck {
+  partition: string;
+  filesystem: string | null;
+  named_files_found: number;
+  note: string;
+}
+
+export interface ErasureCheckResult {
+  device: string;
+  depth: string;
+  passed: boolean;
+  samples_checked: number;
+  avg_entropy: number;
+  pattern_detections: number;
+  pattern_detection_percent: number;
+  signature_hits: { offset: number; signature: string }[];
+  notes: string[];
+  partition_checks: PartitionRecoveryCheck[];
+  error: string;
+  refused: boolean;
+  refusal_reason: string;
+}
+
 // ---- Endpoints ----
 
 export const api = {
@@ -340,4 +369,6 @@ export const api = {
     request<{ success: boolean }>(`/api/recovery/deep-scan/${jobId}/cancel`, { method: "POST" }),
   reports: () => request<Record<string, unknown>>("/api/reports"),
   systemInfo: () => request<Record<string, string>>("/api/system-info"),
+  verifyErasure: (body: { device: string; depth: string }) =>
+    request<ErasureCheckResult>("/api/verify/erasure", { method: "POST", body: JSON.stringify(body) }),
 };
