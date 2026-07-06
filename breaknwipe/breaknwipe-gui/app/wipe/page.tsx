@@ -181,23 +181,43 @@ function WipePageInner() {
           <CardHeader title="Configure wipe" />
           <div className="space-y-5 p-5">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-fg">Algorithm</label>
-              <select
-                value={algorithm}
-                onChange={(e) => setAlgorithm(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-              >
-                {["Standard", "REA (crypto-erase)"].map((group) => (
-                  <optgroup key={group} label={group}>
-                    {ALGORITHMS.filter((a) => a.group === group).map((a) => (
-                      <option key={a.value} value={a.value}>
-                        {a.label} — {a.passes}
-                        {a.note ? ` (${a.note})` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
+              <label className="mb-2.5 block text-sm font-medium text-fg">Algorithm</label>
+              <div className="space-y-4">
+                {(["Standard", "REA (crypto-erase)"] as const).map((group) => (
+                  <div key={group}>
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-fg-subtle">{group}</div>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      {ALGORITHMS.filter((a) => a.group === group).map((a) => {
+                        const active = algorithm === a.value;
+                        return (
+                          <button
+                            key={a.value}
+                            type="button"
+                            onClick={() => setAlgorithm(a.value)}
+                            className={`flex flex-col gap-1.5 rounded-lg border-2 p-3.5 text-left transition-colors ${
+                              active
+                                ? "border-primary bg-primary/8 shadow-[0_0_0_3px_var(--ring)]"
+                                : "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3"
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                              <span className="font-medium text-fg">{a.label}</span>
+                              <Badge tone={active ? "success" : "neutral"}>{a.passes}</Badge>
+                            </div>
+                            <p className="text-xs leading-relaxed text-fg-muted">{a.description}</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                              {a.note && <span className="text-[11px] text-fg-subtle">{a.note}</span>}
+                              {!a.ssdSuitable && (
+                                <span className="text-[11px] text-warning">· designed for HDDs, avoid on SSD/NVMe</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
 
             {configurable && (

@@ -4,6 +4,38 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.7.0] - 2026-07-07
+
+### Changed
+- **Algorithm picker in the Wipe flow is now cards, not a dropdown.** Each of the 13 algorithms
+  (8 standard + 5 REA crypto-erase) shows its pass count, a real description of what it actually
+  does (grounded in `wipe_engine/algorithms.py`'s real pass sequences, not just a marketing label),
+  and an "avoid on SSD/NVMe" note for the HDD-oriented ones (DoD 7-pass, Gutmann, REA Extreme).
+  Selection uses the same bordered-card + ring-glow highlight already used for the Recover/Verify
+  mode toggles, grouped under "Standard" and "REA (crypto-erase)" headings.
+
+## [3.6.1] - 2026-07-07
+
+### Fixed
+- **Critical: fixed-pattern wipe passes were not writing their claimed byte values.**
+  `wipe_engine/algorithms.py` used doubled-backslash byte literals (`b'\\x00'` — four literal ASCII
+  characters, backslash/x/0/0) instead of real byte literals (`b'\x00'`, the actual null byte) for
+  every zeros/ones pass and every Gutmann fixed pattern, across NIST Clear/Purge, DoD 3-pass/7-pass,
+  Gutmann, and the REA family's overwrite phases. Since `engine.py` writes `WipePass.pattern` to the
+  device byte-for-byte, this meant e.g. "Zero Fill" was writing the literal text `\x00\x00\x00...`
+  repeating, not actual zero bytes — the same escaping bug found and fixed earlier in
+  `verification.py`'s file-signature list, but here affecting the wipe engine itself, not just an
+  ancillary check.
+  **Impact:** every affected pass still overwrote the original data with *some* deterministic byte
+  value, so recoverability of prior data was very likely unaffected — but the tool was not actually
+  writing the NIST SP 800-88 / DoD 5220.22-M / Gutmann patterns its algorithm names and certificates
+  claimed. Any certificate generated for a fixed-pattern algorithm before this fix does not accurately
+  describe the bytes that were written. Only the fully-random passes (`_generate_random_block()`,
+  `_generate_rea_pattern()`, both backed by `os.urandom()`) were unaffected. Found while investigating
+  an unrelated GUI change; verified the fix end-to-end by writing each pass to a loopback file and
+  confirming the on-disk bytes now exactly match the claimed pattern (all-`0x00`, all-`0xFF`, Gutmann's
+  specific bit sequences).
+
 ## [3.6.0] - 2026-07-06
 
 ### Added

@@ -3,6 +3,20 @@ Data Wiping Algorithms
 
 Implementation of various secure data wiping algorithms including
 NIST SP 800-88, DoD 5220.22-M, Gutmann Method, and others.
+
+Fixed-pattern passes below must use real byte literals (`b'\x00'`, `b'\xFF'`,
+`b'\x55'`, ...), not a doubled-backslash string (`b'\\x00'`, which is the
+4-character ASCII text "\x00", not the null byte). A previous version of this
+file used the doubled form throughout -- every "zeros"/"ones" pass and every
+Gutmann fixed pattern was silently writing that literal escape-sequence text
+to disk instead of the actual specified byte value. The original data still
+got overwritten (so recoverability was unaffected), but the tool wasn't
+actually writing the NIST/DoD/Gutmann patterns its certificates claimed.
+`WipePass.pattern` is written to the device byte-for-byte (see
+`engine.py::_execute_pass`), so this class of bug is easy to reintroduce
+silently -- if you touch these patterns again, verify with
+`WipeAlgorithm(...).get_passes()[i].pattern[:4]` that you get the real bytes,
+not an escape sequence.
 """
 
 import os
@@ -89,22 +103,22 @@ class WipeAlgorithm:
     def _setup_nist_clear(self):
         """Setup NIST SP 800-88 Clear method (single pass)."""
         self._passes = [
-            WipePass(1, b'\\x00' * self.block_size, "NIST Clear - Zero fill")
+            WipePass(1, b'\x00' * self.block_size, "NIST Clear - Zero fill")
         ]
 
     def _setup_nist_purge(self):
         """Setup NIST SP 800-88 Purge method (3 passes)."""
         self._passes = [
-            WipePass(1, b'\\x00' * self.block_size, "NIST Purge Pass 1 - Zeros"),
-            WipePass(2, b'\\xFF' * self.block_size, "NIST Purge Pass 2 - Ones"),
+            WipePass(1, b'\x00' * self.block_size, "NIST Purge Pass 1 - Zeros"),
+            WipePass(2, b'\xFF' * self.block_size, "NIST Purge Pass 2 - Ones"),
             WipePass(3, self._generate_random_block(), "NIST Purge Pass 3 - Random")
         ]
 
     def _setup_dod_3pass(self):
         """Setup DoD 5220.22-M 3-pass method."""
         self._passes = [
-            WipePass(1, b'\\x00' * self.block_size, "DoD Pass 1 - Write zeros"),
-            WipePass(2, b'\\xFF' * self.block_size, "DoD Pass 2 - Write ones"),
+            WipePass(1, b'\x00' * self.block_size, "DoD Pass 1 - Write zeros"),
+            WipePass(2, b'\xFF' * self.block_size, "DoD Pass 2 - Write ones"),
             WipePass(3, self._generate_random_block(), "DoD Pass 3 - Write random", verify=True)
         ]
 
@@ -112,14 +126,14 @@ class WipeAlgorithm:
         """Setup DoD 5220.22-M 7-pass enhanced method."""
         # First 3-pass cycle
         self._passes.extend([
-            WipePass(1, b'\\x00' * self.block_size, "DoD 7-Pass 1 - Zeros"),
-            WipePass(2, b'\\xFF' * self.block_size, "DoD 7-Pass 2 - Ones"),
+            WipePass(1, b'\x00' * self.block_size, "DoD 7-Pass 1 - Zeros"),
+            WipePass(2, b'\xFF' * self.block_size, "DoD 7-Pass 2 - Ones"),
             WipePass(3, self._generate_random_block(), "DoD 7-Pass 3 - Random"),
         ])
         # Second 3-pass cycle
         self._passes.extend([
-            WipePass(4, b'\\x00' * self.block_size, "DoD 7-Pass 4 - Zeros"),
-            WipePass(5, b'\\xFF' * self.block_size, "DoD 7-Pass 5 - Ones"),
+            WipePass(4, b'\x00' * self.block_size, "DoD 7-Pass 4 - Zeros"),
+            WipePass(5, b'\xFF' * self.block_size, "DoD 7-Pass 5 - Ones"),
             WipePass(6, self._generate_random_block(), "DoD 7-Pass 6 - Random"),
         ])
         # Final random pass with verification
@@ -137,12 +151,12 @@ class WipeAlgorithm:
 
         # 27 specific patterns for different encoding schemes
         gutmann_patterns = [
-            b'\\x55', b'\\xAA', b'\\x92\\x49\\x24', b'\\x49\\x24\\x92',
-            b'\\x24\\x92\\x49', b'\\x00', b'\\x11', b'\\x22', b'\\x33',
-            b'\\x44', b'\\x55', b'\\x66', b'\\x77', b'\\x88', b'\\x99',
-            b'\\xAA', b'\\xBB', b'\\xCC', b'\\xDD', b'\\xEE', b'\\xFF',
-            b'\\x92\\x49\\x24', b'\\x49\\x24\\x92', b'\\x24\\x92\\x49',
-            b'\\x6D\\xB6\\xDB', b'\\xB6\\xDB\\x6D', b'\\xDB\\x6D\\xB6'
+            b'\x55', b'\xAA', b'\x92\x49\x24', b'\x49\x24\x92',
+            b'\x24\x92\x49', b'\x00', b'\x11', b'\x22', b'\x33',
+            b'\x44', b'\x55', b'\x66', b'\x77', b'\x88', b'\x99',
+            b'\xAA', b'\xBB', b'\xCC', b'\xDD', b'\xEE', b'\xFF',
+            b'\x92\x49\x24', b'\x49\x24\x92', b'\x24\x92\x49',
+            b'\x6D\xB6\xDB', b'\xB6\xDB\x6D', b'\xDB\x6D\xB6'
         ]
 
         for i, pattern in enumerate(gutmann_patterns, 5):
@@ -171,7 +185,7 @@ class WipeAlgorithm:
     def _setup_zeros(self):
         """Setup single-pass zero fill."""
         self._passes = [
-            WipePass(1, b'\\x00' * self.block_size, "Zero Fill")
+            WipePass(1, b'\x00' * self.block_size, "Zero Fill")
         ]
 
     def _setup_rea_basic(self):
@@ -180,7 +194,7 @@ class WipeAlgorithm:
             WipePass(1, self._generate_rea_pattern(), "REA Phase 1 - Master Key Generation"),
             WipePass(2, self._generate_rea_pattern(), "REA Phase 2 - Primary Encryption Pass"),
             WipePass(3, self._generate_rea_pattern(), "REA Phase 3 - Randomized Encryption"),
-            WipePass(4, b'\\x00' * self.block_size, "REA Phase 4 - NIST Clear Overwrite"),
+            WipePass(4, b'\x00' * self.block_size, "REA Phase 4 - NIST Clear Overwrite"),
             WipePass(5, self._generate_random_block(), "REA Phase 5 - Final Random Pass")
         ]
 
@@ -192,8 +206,8 @@ class WipeAlgorithm:
             WipePass(3, self._generate_rea_pattern(), "REA-MC Phase 3 - Secondary Chain Encryption"),
             WipePass(4, self._generate_rea_pattern(), "REA-MC Phase 4 - Tertiary Chain Encryption"),
             WipePass(5, self._generate_rea_pattern(), "REA-MC Phase 5 - Final Randomized Layer"),
-            WipePass(6, b'\\x00' * self.block_size, "REA-MC Phase 6 - DoD Zero Pass"),
-            WipePass(7, b'\\xFF' * self.block_size, "REA-MC Phase 7 - DoD Ones Pass"),
+            WipePass(6, b'\x00' * self.block_size, "REA-MC Phase 6 - DoD Zero Pass"),
+            WipePass(7, b'\xFF' * self.block_size, "REA-MC Phase 7 - DoD Ones Pass"),
             WipePass(8, self._generate_random_block(), "REA-MC Phase 8 - DoD Random Pass", verify=True)
         ]
 
@@ -208,10 +222,10 @@ class WipeAlgorithm:
 
         # Gutmann-style overwrite patterns for ultimate security
         gutmann_patterns = [
-            b'\\x55', b'\\xAA', b'\\x92\\x49\\x24', b'\\x49\\x24\\x92',
-            b'\\x24\\x92\\x49', b'\\x00', b'\\x11', b'\\x22', b'\\x33',
-            b'\\x44', b'\\x55', b'\\x66', b'\\x77', b'\\x88', b'\\x99',
-            b'\\xAA', b'\\xBB', b'\\xCC', b'\\xDD', b'\\xEE', b'\\xFF'
+            b'\x55', b'\xAA', b'\x92\x49\x24', b'\x49\x24\x92',
+            b'\x24\x92\x49', b'\x00', b'\x11', b'\x22', b'\x33',
+            b'\x44', b'\x55', b'\x66', b'\x77', b'\x88', b'\x99',
+            b'\xAA', b'\xBB', b'\xCC', b'\xDD', b'\xEE', b'\xFF'
         ]
 
         overwrite_passes = []
@@ -237,14 +251,14 @@ class WipeAlgorithm:
         self._passes = [
             WipePass(1, self._generate_rea_pattern(), "REA-Custom Phase 1 - Key Generation"),
             WipePass(2, self._generate_rea_pattern(), "REA-Custom Phase 2 - Primary Encryption"),
-            WipePass(3, b'\\x00' * self.block_size, "REA-Custom Phase 3 - Zero Overwrite", verify=True),
+            WipePass(3, b'\x00' * self.block_size, "REA-Custom Phase 3 - Zero Overwrite", verify=True),
         ]
 
     def _setup_rea_fast(self):
         """Setup REA Fast - Optimized for speed while maintaining security."""
         self._passes = [
             WipePass(1, self._generate_random_block(), "REA-Fast Phase 1 - Fast Encryption"),
-            WipePass(2, b'\\x00' * self.block_size, "REA-Fast Phase 2 - Zero Overwrite", verify=True),
+            WipePass(2, b'\x00' * self.block_size, "REA-Fast Phase 2 - Zero Overwrite", verify=True),
         ]
 
     def customize_rea_algorithm(self, encryption_layers: int = 2, overwrite_algorithm: str = "nist-clear", fast_mode: bool = False):
@@ -282,19 +296,19 @@ class WipeAlgorithm:
 
         if overwrite_algorithm == "nist-clear":
             self._passes.append(
-                WipePass(pass_offset + 1, b'\\x00' * self.block_size,
+                WipePass(pass_offset + 1, b'\x00' * self.block_size,
                         "REA-Custom Overwrite - NIST Clear", verify=True)
             )
         elif overwrite_algorithm == "nist-purge":
             self._passes.extend([
-                WipePass(pass_offset + 1, b'\\x00' * self.block_size, "REA-Custom Overwrite - Zeros"),
-                WipePass(pass_offset + 2, b'\\xFF' * self.block_size, "REA-Custom Overwrite - Ones"),
+                WipePass(pass_offset + 1, b'\x00' * self.block_size, "REA-Custom Overwrite - Zeros"),
+                WipePass(pass_offset + 2, b'\xFF' * self.block_size, "REA-Custom Overwrite - Ones"),
                 WipePass(pass_offset + 3, self._generate_random_block(), "REA-Custom Overwrite - Random", verify=True)
             ])
         elif overwrite_algorithm == "dod-3pass":
             self._passes.extend([
-                WipePass(pass_offset + 1, b'\\x00' * self.block_size, "REA-Custom Overwrite - DoD Zeros"),
-                WipePass(pass_offset + 2, b'\\xFF' * self.block_size, "REA-Custom Overwrite - DoD Ones"),
+                WipePass(pass_offset + 1, b'\x00' * self.block_size, "REA-Custom Overwrite - DoD Zeros"),
+                WipePass(pass_offset + 2, b'\xFF' * self.block_size, "REA-Custom Overwrite - DoD Ones"),
                 WipePass(pass_offset + 3, self._generate_random_block(), "REA-Custom Overwrite - DoD Random", verify=True)
             ])
         elif overwrite_algorithm == "random":
@@ -306,13 +320,13 @@ class WipeAlgorithm:
             self._passes[-1].verify = True  # Verify last pass
         elif overwrite_algorithm == "zeros":
             self._passes.append(
-                WipePass(pass_offset + 1, b'\\x00' * self.block_size,
+                WipePass(pass_offset + 1, b'\x00' * self.block_size,
                         "REA-Custom Overwrite - Zero Fill", verify=True)
             )
         else:
             # Default to NIST Clear
             self._passes.append(
-                WipePass(pass_offset + 1, b'\\x00' * self.block_size,
+                WipePass(pass_offset + 1, b'\x00' * self.block_size,
                         "REA-Custom Overwrite - Default Zero", verify=True)
             )
 
