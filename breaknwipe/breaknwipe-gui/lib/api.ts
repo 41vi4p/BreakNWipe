@@ -117,6 +117,15 @@ export interface FsckResult {
   notes: string[];
 }
 
+export interface SectorData {
+  device: string;
+  offset: number;
+  length: number;
+  device_size: number;
+  data_base64: string;
+  error: string;
+}
+
 export interface WipeStartRequest {
   device_path: string;
   algorithm: string;
@@ -130,6 +139,26 @@ export interface ApiResponse {
   message: string;
   data?: Record<string, unknown> | null;
 }
+
+export interface WipeProgressState {
+  status: string;
+  progress_percent: number;
+  current_pass: number;
+  total_passes: number;
+  speed_mbps: number;
+  data_processed: number;
+  estimated_remaining: number | null;
+}
+
+export interface WipeSessionSummary {
+  session_id: string;
+  device_info: { path: string; model: string; capacity_human: string };
+  wipe_request: { algorithm: string };
+  progress: WipeProgressState;
+  error_message?: string | null;
+}
+
+export const WIPE_TERMINAL = ["completed", "failed", "cancelled"];
 
 export interface DiskPartitionGeom {
   node: string;
@@ -207,6 +236,50 @@ export interface ResizeRequest {
   dry_run?: boolean;
 }
 
+export interface RecoverableFile {
+  inode: string;
+  path: string;
+  name: string;
+  size: number;
+  deleted_time: string;
+  file_type: string;
+}
+
+export interface RecoveryScanResult {
+  partition: string;
+  filesystem: string | null;
+  files: RecoverableFile[];
+  note: string;
+  error: string;
+  refused: boolean;
+  refusal_reason: string;
+}
+
+export interface RecoveryRestoreResult {
+  partition: string;
+  output_dir: string;
+  requested: number;
+  recovered: number;
+  recovered_files: string[];
+  error: string;
+  refused: boolean;
+  refusal_reason: string;
+}
+
+export interface RecoveryAvailability {
+  tools: { fls: boolean; icat: boolean; photorec: boolean };
+  undelete: boolean;
+  deep_scan: boolean;
+}
+
+export interface RecoveryRestoreRequest {
+  partition: string;
+  output_dir: string;
+  inodes?: string[];
+  deep_scan?: boolean;
+  filesystem?: string | null;
+}
+
 // ---- Endpoints ----
 
 export const api = {
@@ -219,18 +292,28 @@ export const api = {
     request<FsckResult>("/api/fsck/check", { method: "POST", body: JSON.stringify(body) }),
   partitionTable: (path: string) =>
     request<DiskLayout>(`/api/devices/${encodeURIComponent(path)}/partition-table`),
+  sectors: (path: string, offset: number, length: number) =>
+    request<SectorData>(`/api/devices/${encodeURIComponent(path)}/sectors?offset=${offset}&length=${length}`),
   partitionResizePlan: (body: ResizeRequest) =>
     request<ResizePlan>("/api/partition/resize", { method: "POST", body: JSON.stringify({ ...body, dry_run: true }) }),
   partitionResizeApply: (body: ResizeRequest) =>
     request<ResizeResult>("/api/partition/resize", { method: "POST", body: JSON.stringify({ ...body, dry_run: false }) }),
   wipeStart: (body: WipeStartRequest) =>
     request<ApiResponse>("/api/wipe/start", { method: "POST", body: JSON.stringify(body) }),
-  wipeStatus: (sessionId: string) => request<Record<string, unknown>>(`/api/wipe/status/${sessionId}`),
+  wipeStatus: (sessionId: string) => request<WipeSessionSummary>(`/api/wipe/status/${sessionId}`),
+  wipeSessions: () => request<WipeSessionSummary[]>("/api/wipe/sessions"),
+  wipeCancel: (sessionId: string) =>
+    request<ApiResponse>(`/api/wipe/cancel/${sessionId}`, { method: "POST" }),
   wipeReport: (sessionId: string) => request<Record<string, unknown>>(`/api/wipe/report/${sessionId}`),
   logs: (params?: Record<string, string | number>) => {
     const q = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
     return request<Record<string, unknown>>(`/api/logs${q}`);
   },
+  recoveryAvailable: () => request<RecoveryAvailability>("/api/recovery/available"),
+  recoveryScan: (body: { partition: string; filesystem?: string | null }) =>
+    request<RecoveryScanResult>("/api/recovery/scan", { method: "POST", body: JSON.stringify(body) }),
+  recoveryRestore: (body: RecoveryRestoreRequest) =>
+    request<RecoveryRestoreResult>("/api/recovery/restore", { method: "POST", body: JSON.stringify(body) }),
   reports: () => request<Record<string, unknown>>("/api/reports"),
   systemInfo: () => request<Record<string, string>>("/api/system-info"),
 };

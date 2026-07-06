@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Binary, FileSearch } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useQueryParam } from "@/lib/hooks";
 import { Button, Card, CardHeader, DataValue, ErrorState, PageTitle, Spinner, Badge } from "@/components/ui";
@@ -33,12 +33,26 @@ export default function DevicePage() {
           <PageTitle title={device?.model || "Device"} />
           <DataValue className="-mt-4 block text-sm text-fg-muted">{path}</DataValue>
         </div>
-        <Link href={`/wipe/?path=${encodeURIComponent(path)}`}>
-          <Button variant="danger" size="sm">
-            <Trash2 size={15} />
-            Wipe device
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/recover/?path=${encodeURIComponent(path)}`}>
+            <Button variant="secondary" size="sm">
+              <FileSearch size={15} />
+              Recover files
+            </Button>
+          </Link>
+          <Link href={`/hex/?path=${encodeURIComponent(path)}`}>
+            <Button variant="secondary" size="sm">
+              <Binary size={15} />
+              View sectors
+            </Button>
+          </Link>
+          <Link href={`/wipe/?path=${encodeURIComponent(path)}`}>
+            <Button variant="danger" size="sm">
+              <Trash2 size={15} />
+              Wipe device
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {devices.loading && <Spinner label="Loading device…" />}

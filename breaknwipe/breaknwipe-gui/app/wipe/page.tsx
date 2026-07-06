@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldAlert, Download, CheckCircle2, XCircle } from "lucide-react";
-import { api, apiUrl, type DeviceInfo } from "@/lib/api";
+import { ArrowLeft, ShieldAlert, Download, CheckCircle2, XCircle, Ban, Binary } from "lucide-react";
+import { api, apiUrl, WIPE_TERMINAL, type DeviceInfo, type WipeProgressState } from "@/lib/api";
 import { ALGORITHMS, algorithmLabel } from "@/lib/algorithms";
 import { useAsync, useQueryParam } from "@/lib/hooks";
 import { useWebSocket } from "@/lib/use-websocket";
@@ -11,15 +11,7 @@ import { formatBytes, formatDuration } from "@/lib/format";
 import { Button, Card, CardHeader, DataValue, ErrorState, PageTitle, ProgressBar, Spinner, Badge } from "@/components/ui";
 import { ConfirmDialog } from "@/components/dialog";
 
-interface WipeProgress {
-  status: string;
-  progress_percent: number;
-  current_pass: number;
-  total_passes: number;
-  speed_mbps: number;
-  data_processed: number;
-  estimated_remaining: number | null;
-}
+type WipeProgress = WipeProgressState;
 
 export default function WipePage() {
   const path = useQueryParam("path");
@@ -32,12 +24,42 @@ export default function WipePage() {
   const [certificate, setCertificate] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Seeds progress instantly when resuming an existing session, before the
+  // WebSocket delivers its first live update.
+  const [seed, setSeed] = useState<WipeProgress | null>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
 
   const { last } = useWebSocket<{ type: string; data: WipeProgress }>(sessionId ? `/ws/${sessionId}` : null);
-  const progress = last?.data;
+  const progress = last?.data ?? seed;
   const configurable = ALGORITHMS.find((a) => a.value === algorithm)?.configurablePasses;
+
+  // On load, reconnect to an in-progress (or the latest) wipe for this device —
+  // so navigating away and back doesn't lose the running wipe.
+  useEffect(() => {
+    if (!path) return;
+    let alive = true;
+    api
+      .wipeSessions()
+      .then((sessions) => {
+        if (!alive) return;
+        const mine = sessions.filter((s) => s.device_info?.path === path);
+        const active = mine.find((s) => !WIPE_TERMINAL.includes(s.progress.status));
+        const resume = active ?? mine[mine.length - 1];
+        if (resume) {
+          setSessionId(resume.session_id);
+          setSeed(resume.progress);
+          setAlgorithm(resume.wipe_request?.algorithm ?? "nist-clear");
+        }
+      })
+      .catch(() => {})
+      .finally(() => alive && setResumeChecked(true));
+    return () => {
+      alive = false;
+    };
+  }, [path]);
 
   if (!path) return <ErrorState message="No device path given. Open a device from Devices first." />;
 
@@ -54,6 +76,7 @@ export default function WipePage() {
         passes: configurable ? passes : null,
       });
       const id = (res.data?.session_id as string) ?? null;
+      setSeed(null);
       setSessionId(id);
     } catch (e) {
       setStartError((e as Error).message);
@@ -63,7 +86,25 @@ export default function WipePage() {
     }
   }
 
-  const done = progress && ["completed", "failed", "cancelled"].includes(progress.status);
+  async function cancel() {
+    if (!sessionId) return;
+    setCancelling(true);
+    try {
+      await api.wipeCancel(sessionId);
+    } catch (e) {
+      setStartError((e as Error).message);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  function newWipe() {
+    setSessionId(null);
+    setSeed(null);
+    setStartError(null);
+  }
+
+  const done = progress && WIPE_TERMINAL.includes(progress.status);
   const succeeded = progress?.status === "completed";
 
   return (
@@ -76,7 +117,7 @@ export default function WipePage() {
         <DataValue className="-mt-4 block text-sm text-fg-muted">{path}</DataValue>
       </div>
 
-      {loading && <Spinner label="Loading device…" />}
+      {(loading || !resumeChecked) && <Spinner label="Checking for an in-progress wipe…" />}
 
       {device && (
         <div className="rounded-lg border border-danger/30 bg-danger/8 px-4 py-3">
@@ -94,7 +135,7 @@ export default function WipePage() {
         </div>
       )}
 
-      {!sessionId && (
+      {resumeChecked && !sessionId && (
         <Card>
           <CardHeader title="Configure wipe" />
           <div className="space-y-5 p-5">
@@ -185,6 +226,13 @@ export default function WipePage() {
                   <Stat label="Processed" value={formatBytes(progress.data_processed)} />
                   <Stat label="ETA" value={formatDuration(progress.estimated_remaining)} />
                 </div>
+                {!done && (
+                  <div className="flex justify-end border-t border-border pt-4">
+                    <Button variant="danger" size="sm" loading={cancelling} onClick={cancel}>
+                      <Ban size={15} /> Cancel wipe
+                    </Button>
+                  </div>
+                )}
               </>
             )}
 
@@ -201,7 +249,7 @@ export default function WipePage() {
                     </>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {certificate && succeeded && (
                     <a href={apiUrl(`/api/wipe/download/${sessionId}`)} target="_blank" rel="noreferrer">
                       <Button variant="secondary" size="sm">
@@ -209,6 +257,16 @@ export default function WipePage() {
                       </Button>
                     </a>
                   )}
+                  {succeeded && (
+                    <Link href={`/hex/?path=${encodeURIComponent(path)}`}>
+                      <Button variant="secondary" size="sm">
+                        <Binary size={15} /> View sectors
+                      </Button>
+                    </Link>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={newWipe}>
+                    Start another wipe
+                  </Button>
                   <Link href="/">
                     <Button variant="ghost" size="sm">
                       Back to devices

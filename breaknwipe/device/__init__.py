@@ -22,6 +22,16 @@ from .partition import (
     list_logical_volumes,
     extend_lv,
 )
+from .hexview import SectorData, read_sectors, device_size_bytes
+from .recovery import (
+    RecoverableFile,
+    ScanResult,
+    RecoverResult,
+    recovery_tools,
+    scan_deleted,
+    recover_files,
+    deep_scan_recover,
+)
 
 __all__ = [
     'DeviceDetector',
@@ -45,4 +55,14 @@ __all__ = [
     'get_disk_layout',
     'list_logical_volumes',
     'extend_lv',
+    'SectorData',
+    'read_sectors',
+    'device_size_bytes',
+    'RecoverableFile',
+    'ScanResult',
+    'RecoverResult',
+    'recovery_tools',
+    'scan_deleted',
+    'recover_files',
+    'deep_scan_recover',
 ]

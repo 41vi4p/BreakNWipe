@@ -73,6 +73,8 @@ install_system_packages() {
         "xfsprogs"
         "btrfs-progs"
         "ntfs-3g"
+        "sleuthkit"
+        "testdisk"
         "build-essential"
         "libssl-dev"
         "libffi-dev"

@@ -128,6 +128,21 @@ class LvExtendRequest(BaseModel):
     lv_path: str = Field(..., description="Logical volume path, e.g. /dev/ubuntu-vg/ubuntu-lv")
 
 
+class RecoveryScanRequest(BaseModel):
+    """Request to scan a partition for recoverable deleted files (read-only)."""
+    partition: str = Field(..., description="Partition to scan, e.g. /dev/sdb1")
+    filesystem: Optional[str] = Field(default=None, description="Override auto-detected filesystem type")
+
+
+class RecoveryRestoreRequest(BaseModel):
+    """Request to recover selected deleted files to an output folder on a different device."""
+    partition: str = Field(..., description="Partition to recover from, e.g. /dev/sdb1")
+    output_dir: str = Field(..., description="Folder to write recovered files to (must be on a different device)")
+    inodes: List[str] = Field(default_factory=list, description="Metadata addresses of files to recover (from a scan)")
+    deep_scan: bool = Field(default=False, description="Use signature-based carving (PhotoRec) instead of inode undelete")
+    filesystem: Optional[str] = Field(default=None, description="Override auto-detected filesystem type")
+
+
 class WipeRequest(BaseModel):
     """Request to start a wipe operation."""
     device_path: str = Field(..., description="Target device path")

@@ -364,6 +364,86 @@ def resize(partition, mode, size, start, do_apply, force):
 
 
 @main.command()
+@click.argument('partition', shell_complete=complete_device_path)
+@click.option('--output', '-o', default=None, help='Folder to recover files into (must be on a DIFFERENT drive)')
+@click.option('--deep', is_flag=True, help='Signature-carve with PhotoRec (recovers content without filenames)')
+@click.option('--all', 'recover_all', is_flag=True, help='Recover every found file (quick scan only; default is scan-only)')
+@click.option('--filesystem', '-t', default=None, help='Override auto-detected filesystem type')
+def recover(partition, output, deep, recover_all, filesystem):
+    """Find and recover deleted files from a PARTITION.
+
+    Scans for files that were deleted or quick-formatted but not yet overwritten.
+    By default this only lists what's recoverable; pass --output <folder> with
+    --all (or --deep) to actually restore. The output folder must be on a
+    DIFFERENT drive so recovery can't overwrite the data it's reading. Note: a
+    drive securely wiped by BreakNWipe has nothing to recover -- that's the point.
+    """
+    from ..device.recovery import scan_deleted, recover_files, deep_scan_recover, recovery_tools
+
+    tools = recovery_tools()
+
+    if deep:
+        if not output:
+            console.print("[red]--output <folder> is required with --deep[/red]")
+            sys.exit(1)
+        if not tools['photorec']:
+            console.print("[red]PhotoRec is not installed (package: testdisk).[/red]")
+            sys.exit(1)
+        console.print(f"[blue]Deep-scanning {partition} with PhotoRec…[/blue]")
+        result = deep_scan_recover(partition, output)
+        if result.refused:
+            console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+            sys.exit(1)
+        if result.error:
+            console.print(f"[red]{result.error}[/red]")
+            sys.exit(1)
+        console.print(f"[green]Carved {result.recovered} files into {result.output_dir}.[/green]")
+        return
+
+    if not tools['fls']:
+        console.print("[red]The Sleuth Kit is not installed (package: sleuthkit).[/red] "
+                      "Use --deep for PhotoRec-based recovery instead.")
+        sys.exit(1)
+
+    console.print(f"[blue]Scanning {partition} for deleted files…[/blue]")
+    scan = scan_deleted(partition, filesystem=filesystem)
+    if scan.refused:
+        console.print(f"[red]Refused:[/red] {scan.refusal_reason}")
+        sys.exit(1)
+    if scan.error:
+        console.print(f"[red]{scan.error}[/red]")
+        sys.exit(1)
+    if scan.note:
+        console.print(f"[yellow]Note:[/yellow] {scan.note}")
+
+    console.print(f"Found [cyan]{len(scan.files)}[/cyan] recoverable deleted file(s).")
+    for f in scan.files[:200]:
+        console.print(f"  [dim]{f.inode:>14}[/dim]  {f.name}  [dim]({f.size:,} bytes)[/dim]")
+    if len(scan.files) > 200:
+        console.print(f"  [dim]… and {len(scan.files) - 200} more[/dim]")
+
+    if not recover_all:
+        console.print("\n[dim]Scan only. Re-run with --output <folder> --all to recover, "
+                      "or --deep for content-based carving.[/dim]")
+        return
+
+    if not output:
+        console.print("[red]--output <folder> is required with --all[/red]")
+        sys.exit(1)
+
+    inodes = [f.inode for f in scan.files]
+    console.print(f"[blue]Recovering {len(inodes)} files to {output}…[/blue]")
+    result = recover_files(partition, inodes, output, filesystem=filesystem)
+    if result.refused:
+        console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+        sys.exit(1)
+    if result.error and result.recovered == 0:
+        console.print(f"[red]{result.error}[/red]")
+        sys.exit(1)
+    console.print(f"[green]Recovered {result.recovered}/{result.requested} files into {result.output_dir}.[/green]")
+
+
+@main.command()
 def list_algorithms():
     """List all available wiping algorithms."""
 

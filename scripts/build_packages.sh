@@ -209,6 +209,8 @@ build_deb_package() {
         --depends "xfsprogs" \
         --depends "ntfs-3g" \
         --depends "btrfs-progs" \
+        --depends "sleuthkit" \
+        --depends "testdisk" \
         --package "$deb_dir" \
         --after-install scripts/postinst \
         --before-remove scripts/prerm \
@@ -256,6 +258,8 @@ build_rpm_package() {
         --depends "xfsprogs" \
         --depends "ntfs-3g" \
         --depends "btrfs-progs" \
+        --depends "sleuthkit" \
+        --depends "testdisk" \
         --package "$rpm_dir" \
         --after-install scripts/postinst \
         --before-remove scripts/prerm \

@@ -1,6 +1,6 @@
 # BreakNWipe → complete disk toolkit — roadmap
 
-**Status: Phases 1 & 2 shipped; Phases 3–4 planned.** This document is the roadmap for growing
+**Status: Phases 1–4 all shipped.** This document is the roadmap for growing
 BreakNWipe from a secure-wipe utility into a general-purpose, genuinely usable disk toolkit — one
 that beats GParted / testdisk / GNOME-Disks on *approachability* while keeping the wipe + tamper-
 proof certificate as a flagship feature. The name stays **BreakNWipe**; positioning broadens.
@@ -57,17 +57,22 @@ rewrite; `parted` removed `move`) is gated hardest and labelled experimental. Al
 exact commands; never auto-unmount; system-disk + typed-confirmation gates. Interactive partition-
 map GUI. Adds `cloud-guest-utils`/`lvm2`/`xfsprogs`/`btrfs-progs`/`ntfs-3g` deps.
 
-### Phase 3 — Hex / sector viewer (read-only)
+### Phase 3 — Hex / sector viewer (read-only) ✅ shipped (v3.2.0)
 `read_sectors(path, offset, length)` (read-only, bounded chunk) + `GET
 /api/devices/{path}/sectors`. Virtualized hex+ASCII GUI (windowed rendering for multi-TB devices),
 "jump to offset", sector boundaries. Wired into the post-wipe flow to visually confirm zeros/pattern.
 
-### Phase 4 — File recovery (heaviest)
-`breaknwipe/device/recovery.py`: filesystem-aware undelete via **pytsk3** (The Sleuth Kit) —
-deleted files with names/size/deletion-time/recoverability — plus a **photorec** deep-carve
-fallback for damaged/partly-overwritten drives. Scan (WebSocket progress) → browse tree →
-selectively restore to a **different** device (enforced). Honest framing: a fully-wiped drive is
-unrecoverable. Adds `testdisk` + `libtsk`/`pytsk3` deps.
+### Phase 4 — File recovery (heaviest) ✅ shipped (v3.3.0)
+`breaknwipe/device/recovery.py`, two complementary modes (both shelling out to established forensic
+tools, matching the project's subprocess pattern — chosen over the `pytsk3` C-binding for clean
+packaging): *Quick scan* via **The Sleuth Kit** CLI (`fls` to enumerate deleted entries, `icat` to
+extract by metadata address) recovers files **with original names** on NTFS/FAT/exFAT; *Deep scan*
+via **PhotoRec** (`photorec`) signature-carves file bodies even when metadata is gone (ext4,
+quick-format, damaged), without names. Scan (read-only) → browse (name/size/path, multi-select) →
+restore to a **different** device (enforced in the module, not just the UI — refuses if the output
+folder is on the source device). Honest framing: a fully-wiped drive is unrecoverable, stated in the
+UI. `GET /api/recovery/available`, `POST /api/recovery/scan`, `POST /api/recovery/restore`; `/recover`
+GUI page; `breaknwipe recover` CLI command. Adds `sleuthkit` + `testdisk` deps.
 
 ## Cross-cutting
 

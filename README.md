@@ -6,7 +6,7 @@
 
 **A complete, approachable disk toolkit — securely wipe drives with tamper-proof certificates, inspect health, manage partitions, and repair filesystems, all from one clean interface.**
 
-[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/41vi4p/BreakNWipe/main/scripts/unin
 
 BreakNWipe started as a secure-wipe utility for **Smart India Hackathon 2025** (Team CodeBreakers!)
 and is growing into a **complete, open-source disk toolkit** — the tool you reach for to wipe,
-inspect, repair, resize, and (soon) recover drives, without the confusion of existing tools.
+inspect, repair, resize, and recover drives, without the confusion of existing tools.
 Secure wipe with tamper-proof, blockchain-anchored certificates remains its flagship. See
 [`docs/DISK_TOOLKIT_PLAN.md`](docs/DISK_TOOLKIT_PLAN.md) for the roadmap.
 
@@ -113,6 +113,8 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 - [x] **Partition browsing** — filesystem type, size, and mount point per partition, in both the CLI (`breaknwipe info <device>`) and the web GUI
 - [x] **Filesystem repair (fsck)** — checks (and, with `--repair`, fixes) ext2/3/4, FAT/exFAT, NTFS, XFS, and Btrfs filesystems, with a safety model that never auto-unmounts and gates repairing system/Btrfs filesystems behind `--force`. Available as `breaknwipe fsck <partition>` and from each device's web GUI details page.
 - [x] **Partition resize** — grow into free space (**live** for ext4/XFS/Btrfs — extend your root partition without a live USB), shrink, and move, plus the one-step "my VM/root disk grew but the partition didn't" fix (`growpart` + filesystem grow, or LVM `lvextend`). Interactive partition map in the GUI and a `breaknwipe resize` CLI command — both **preview the exact commands** before running and require typed confirmation; shrink/move are offline-only and never auto-unmount.
+- [x] **Hex / sector viewer** — read-only view of raw device bytes (hex + ASCII, sector boundaries, jump-to-offset) in the web GUI, wired into the post-wipe screen so you can *see* a drive is actually zeroed.
+- [x] **Deleted-file recovery** — undelete accidentally-deleted or quick-formatted files. A *quick scan* (The Sleuth Kit) recovers files **with their original names** on NTFS/FAT/exFAT (USB sticks, SD cards, Windows drives); a *deep scan* (PhotoRec) carves file contents by type even from ext4 or damaged drives. Simple browse-and-select GUI at `/recover`, a `breaknwipe recover <partition>` CLI command, and an honest reminder that a securely-wiped drive has nothing to recover. Recovery always writes to a **different** drive so it can't overwrite what it's reading.
 
 #### Certification & Verification
 - [x] **Digitally signed PDF certificates** (RSA / X.509)
@@ -259,6 +261,8 @@ Restart your shell (or `source` the relevant rc file) afterward. To also complet
 | `wipe` | Perform secure data wiping |
 | `info <device>` | Display detailed device information, health, and partitions |
 | `fsck <partition>` | Check (and, with `--repair`, fix) a filesystem's integrity |
+| `resize <partition>` | Grow / shrink / move a partition (preview-first) |
+| `recover <partition>` | Find and recover deleted files (quick scan or `--deep` carve) |
 | `list-algorithms` | Show available wiping algorithms |
 | `batch` | Batch processing from a JSON/YAML config file |
 | `verify-certificate` | Verify wipe certificate authenticity |

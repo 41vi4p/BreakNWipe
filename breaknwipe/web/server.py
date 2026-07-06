@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 from .models import (
     ApiResponse, DeviceInfo, WipeRequest, WipeSession, WipeProgress,
     WebSocketMessage, WipeSessionStatus, PartitionModel, DeviceHealthModel,
-    FsckCheckRequest, PartitionResizeRequest, LvExtendRequest
+    FsckCheckRequest, PartitionResizeRequest, LvExtendRequest,
+    RecoveryScanRequest, RecoveryRestoreRequest
 )
 from .session_manager import WipeSessionManager
 from ..device.filesystem import list_partitions
@@ -182,6 +183,18 @@ class WebServer:
                 logger.exception(f"fsck failed for {request.partition}")
                 raise HTTPException(status_code=500, detail="fsck failed. See server logs for details.")
 
+        @self.app.get("/api/devices/{device_path:path}/sectors")
+        def read_sectors_endpoint(device_path: str, offset: int = 0, length: int = 512):
+            """Read raw bytes from a device (read-only) for the hex/sector viewer.
+            Length is clamped server-side; reading raw devices requires root."""
+            device_path = "/" + device_path if not device_path.startswith("/") else device_path
+            try:
+                from ..device.hexview import read_sectors
+                return JSONResponse(content=read_sectors(device_path, offset, length).to_dict())
+            except Exception:
+                logger.exception(f"Sector read failed for {device_path}")
+                raise HTTPException(status_code=500, detail="Sector read failed. See server logs for details.")
+
         # ---- Partition management (sync handlers -> thread pool; blocking subprocess) ----
 
         @self.app.get("/api/devices/{device_path:path}/partition-table")
@@ -246,6 +259,48 @@ class WebServer:
             except Exception:
                 logger.exception(f"LV extend failed for {request.lv_path}")
                 raise HTTPException(status_code=500, detail="LV extend failed. See server logs for details.")
+
+        # ---- File recovery (sync handlers -> thread pool; blocking subprocess) ----
+
+        @self.app.get("/api/recovery/available")
+        def recovery_available_endpoint():
+            """Which recovery tools are installed (drives what the GUI offers)."""
+            from ..device.recovery import recovery_tools
+            tools = recovery_tools()
+            return JSONResponse(content={
+                "tools": tools,
+                "undelete": tools["fls"] and tools["icat"],
+                "deep_scan": tools["photorec"],
+            })
+
+        @self.app.post("/api/recovery/scan")
+        def recovery_scan_endpoint(request: RecoveryScanRequest):
+            """List recoverable deleted files on a partition. Read-only; all
+            safety gates live in recovery.scan_deleted (validated paths)."""
+            try:
+                from ..device.recovery import scan_deleted
+                return JSONResponse(content=scan_deleted(request.partition, request.filesystem).to_dict())
+            except Exception:
+                logger.exception(f"Recovery scan failed for {request.partition}")
+                raise HTTPException(status_code=500, detail="Recovery scan failed. See server logs for details.")
+
+        @self.app.post("/api/recovery/restore")
+        def recovery_restore_endpoint(request: RecoveryRestoreRequest):
+            """Recover selected files (icat) or deep-carve (photorec) to a folder
+            on a DIFFERENT device -- enforced in recovery.* so the client cannot
+            overwrite the data it's recovering."""
+            try:
+                from ..device.recovery import recover_files, deep_scan_recover
+                if request.deep_scan:
+                    result = deep_scan_recover(request.partition, request.output_dir)
+                else:
+                    result = recover_files(
+                        request.partition, request.inodes, request.output_dir, request.filesystem
+                    )
+                return JSONResponse(content=result.to_dict())
+            except Exception:
+                logger.exception(f"Recovery restore failed for {request.partition}")
+                raise HTTPException(status_code=500, detail="Recovery restore failed. See server logs for details.")
 
         @self.app.post("/api/wipe/start", response_model=ApiResponse)
         async def start_wipe(wipe_request: WipeRequest, background_tasks: BackgroundTasks):

@@ -1,13 +1,16 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
-import { api } from "@/lib/api";
+import Link from "next/link";
+import { RefreshCw, Activity } from "lucide-react";
+import { api, WIPE_TERMINAL } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { DeviceCard } from "@/components/device-card";
-import { Button, EmptyState, ErrorState, PageTitle, Spinner } from "@/components/ui";
+import { Button, DataValue, EmptyState, ErrorState, PageTitle, Spinner } from "@/components/ui";
 
 export default function DevicesPage() {
   const { data: devices, error, loading, reload } = useAsync(() => api.devices(), []);
+  const { data: sessions } = useAsync(() => api.wipeSessions().catch(() => []), []);
+  const activeWipes = (sessions ?? []).filter((s) => !WIPE_TERMINAL.includes(s.progress.status));
 
   return (
     <div>
@@ -21,6 +24,25 @@ export default function DevicesPage() {
           Refresh
         </Button>
       </div>
+
+      {activeWipes.length > 0 && (
+        <div className="mb-5 space-y-2">
+          {activeWipes.map((s) => (
+            <Link
+              key={s.session_id}
+              href={`/wipe/?path=${encodeURIComponent(s.device_info.path)}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-info/30 bg-info/8 px-4 py-3 text-sm transition-colors hover:bg-info/12"
+            >
+              <span className="flex items-center gap-2 text-info">
+                <Activity size={16} className="animate-pulse" />
+                Wipe in progress on <DataValue className="text-fg">{s.device_info.path}</DataValue> ·{" "}
+                {s.progress.progress_percent.toFixed(0)}%
+              </span>
+              <span className="font-medium text-info">Resume →</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {loading && <Spinner label="Detecting storage devices…" />}
 

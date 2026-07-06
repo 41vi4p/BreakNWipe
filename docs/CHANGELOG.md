@@ -4,6 +4,79 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.3.0] - 2026-07-06
+
+Phase 4 (final) of the disk-toolkit roadmap: **deleted-file recovery.**
+
+### Added
+- **Deleted-file recovery** — a new `breaknwipe/device/recovery.py` with two complementary modes,
+  both shelling out to established forensic tools (matching the project's lsblk/hdparm/blkid
+  pattern):
+  - *Quick scan (by name)* via **The Sleuth Kit** (`fls` to enumerate deleted entries, `icat` to
+    extract them by metadata address) — recovers files **with their original names** on NTFS / FAT /
+    exFAT, the common "I deleted files off my USB stick / SD card / Windows drive" case.
+  - *Deep scan (by content)* via **PhotoRec** (`photorec`, signature-based carving) — recovers file
+    *bodies* even when filesystem metadata is gone (ext4, quick-formatted, or damaged drives), at the
+    cost of losing original filenames.
+- **Honest framing throughout:** the UI states plainly that a drive securely wiped by BreakNWipe has
+  nothing to recover — recovery is for accidents, not for undoing a wipe.
+- **Safety:** scanning is read-only; recovery only writes to a caller-chosen output folder and
+  **refuses if that folder is on the same device being recovered from** (which would overwrite the
+  very data being recovered), enforced in the module (not just the UI). Validated block-device paths
+  throughout.
+- **Endpoints** (sync `def` → Starlette thread pool, like fsck/resize): `GET /api/recovery/available`
+  (which tools are installed), `POST /api/recovery/scan` (list recoverable files), `POST
+  /api/recovery/restore` (extract selected inodes, or deep-carve).
+- **GUI** — a new `/recover` page: pick a partition, choose Quick or Deep scan, browse the deleted
+  files (name / size / path) with select-all and per-file checkboxes, set an output folder, and
+  recover. Reachable from each device page ("Recover files").
+- **CLI** — a new `breaknwipe recover <partition>` command (scan-only by default; `--output` +
+  `--all` to restore, `--deep` for PhotoRec carving).
+- **Packaging** — `sleuthkit` and `testdisk` added to `scripts/install_dependencies.sh` and the
+  `.deb`/`.rpm` `--depends`.
+
+## [3.2.1] - 2026-07-06
+
+### Fixed
+- **Hex viewer now scrolls through the whole device.** The initial version showed only a fixed
+  window with Prev/Next buttons; it's been rebuilt as a proper **virtualized scroller** (like
+  Autopsy) — one continuous scroll pane over the entire device, with only the visible rows rendered
+  and their backing 8 KiB chunks fetched lazily as they scroll into view (so even a multi-TB drive
+  scrolls smoothly). Jump-to-offset, Start/End, and 512-byte sector-boundary highlighting are kept;
+  not-yet-loaded bytes show as `··` until their chunk arrives.
+
+## [3.2.0] - 2026-07-06
+
+Phase 3 of the disk-toolkit roadmap: **hex / sector viewer.**
+
+### Added
+- **Raw sector viewer** — a new read-only `breaknwipe/device/hexview.py` (`read_sectors(path,
+  offset, length)`) opens a device with `O_RDONLY`, seeks, and reads a **bounded** chunk (clamped to
+  64 KiB) returned base64-encoded alongside the device's total size. Validated block-device paths;
+  reading raw devices requires root. New endpoint `GET /api/devices/{path}/sectors?offset=&length=`.
+- **Hex viewer GUI** — a new `/hex` page and `HexViewer` component: hex + ASCII columns with an
+  offset gutter, **512-byte sector boundaries marked**, jump-to-offset (hex `0x…` or decimal), and
+  windowed paging (only the visible window is fetched/rendered, so multi-TB devices are fine).
+  Reachable from each device page ("View sectors") and — the point of it — from the **post-wipe
+  completion screen**, so you can immediately open the drive and *see* it's zeroed.
+- Verified on a loopback device: wrote a known pattern and read it back byte-exact through both the
+  function and the HTTP endpoint; confirmed reads past the data return zeros; confirmed the 64 KiB
+  length clamp and invalid-path refusal; and confirmed that after zeroing the device the viewer
+  reads all zeros — the wipe-verification use case.
+
+## [3.1.1] - 2026-07-06
+
+### Fixed / Added (GUI)
+- **Resumable wipe progress** — starting a wipe and then navigating away no longer loses access to
+  the running operation. The wipe page now reconnects to an in-progress (or the most recent) wipe
+  for the device on load (via `/api/wipe/sessions` + the WebSocket, which already reports current
+  status on connect), and the Devices page shows a "wipe in progress · Resume →" banner for any
+  active wipe.
+- **Cancel a running wipe** — a Cancel button on the progress view (wired to the existing
+  `/api/wipe/cancel/{id}` endpoint), plus a "Start another wipe" action once a wipe finishes.
+- **Richer About page** — full project overview, a capabilities grid, Team CodeBreakers with roles,
+  a GitHub link, and the live system-info panel.
+
 ## [3.1.0] - 2026-07-06
 
 Phase 2 of the disk-toolkit roadmap: **partition management with full resize.**
