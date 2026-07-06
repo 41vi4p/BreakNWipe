@@ -8,7 +8,7 @@
 
 [![Version](https://img.shields.io/badge/version-3.6.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
 [![Next.js GUI](https://img.shields.io/badge/GUI-Next.js%20%2B%20FastAPI-000000.svg?logo=next.js&logoColor=white)](#%EF%B8%8F-user-interfaces)
 [![Solidity](https://img.shields.io/badge/Solidity-Sepolia%20Testnet-363636.svg?logo=solidity&logoColor=white)](#-blockchain-verification)

@@ -133,10 +133,9 @@ class WebServer:
                 return devices
             except HTTPException:
                 raise
-            except Exception as e:
-                import traceback
-                error_detail = f"Device detection failed: {str(e)}\nTraceback: {traceback.format_exc()}"
-                raise HTTPException(status_code=500, detail=error_detail)
+            except Exception:
+                logger.exception("Device detection failed")
+                raise HTTPException(status_code=500, detail="Device detection failed. See server logs for details.")
 
         # Note: these three are defined as plain `def`, not `async def` --
         # FastAPI/Starlette runs sync route handlers in a thread pool
@@ -342,11 +341,11 @@ class WebServer:
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True,
                 )
-            except OSError as e:
+            except OSError:
                 logger.exception("Failed to launch GParted")
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Could not launch GParted ({e}). Try running 'sudo gparted' from a terminal instead.",
+                    detail="Could not launch GParted. Try running 'sudo gparted' from a terminal instead.",
                 )
             return JSONResponse(content={"success": True})
 
@@ -550,8 +549,14 @@ class WebServer:
                     message="Wipe operation started successfully",
                     data={"session_id": session_id}
                 )
-            except Exception as e:
+            except ValueError as e:
+                # start_wipe_session raises this deliberately (e.g. "Device
+                # /dev/sdX not found") -- a clean, expected message, safe and
+                # useful to echo back as-is.
                 raise HTTPException(status_code=400, detail=str(e))
+            except Exception:
+                logger.exception("Failed to start wipe")
+                raise HTTPException(status_code=500, detail="Failed to start wipe. See server logs for details.")
 
         @self.app.get("/api/wipe/status/{session_id}", response_model=WipeSession)
         async def get_wipe_status(session_id: str):
@@ -662,8 +667,9 @@ class WebServer:
                     "data": logs,
                     "total": len(logs)
                 }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Failed to fetch logs")
+                raise HTTPException(status_code=500, detail="Failed to fetch logs. See server logs for details.")
 
         @self.app.get("/api/logs/statistics")
         async def get_log_statistics():
@@ -674,8 +680,9 @@ class WebServer:
                     "success": True,
                     "data": stats
                 }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Failed to fetch log statistics")
+                raise HTTPException(status_code=500, detail="Failed to fetch log statistics. See server logs for details.")
 
         @self.app.get("/api/logs/device/{device_path:path}")
         async def get_device_logs(device_path: str):
@@ -687,8 +694,9 @@ class WebServer:
                     "data": logs,
                     "total": len(logs)
                 }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to fetch logs for {device_path}")
+                raise HTTPException(status_code=500, detail="Failed to fetch device logs. See server logs for details.")
 
         @self.app.get("/api/logs/device-history")
         async def get_device_history(device_path: str = None):
@@ -699,8 +707,9 @@ class WebServer:
                     "success": True,
                     "data": history
                 }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to fetch device history for {device_path}")
+                raise HTTPException(status_code=500, detail="Failed to fetch device history. See server logs for details.")
 
         @self.app.get("/api/logs/audit/{session_id}")
         async def get_audit_trail(session_id: str):
@@ -711,8 +720,9 @@ class WebServer:
                     "success": True,
                     "data": audit_events
                 }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to fetch audit trail for {session_id}")
+                raise HTTPException(status_code=500, detail="Failed to fetch audit trail. See server logs for details.")
 
         @self.app.get("/api/logs/{session_id}")
         async def get_log_by_session(session_id: str):
@@ -728,8 +738,9 @@ class WebServer:
                 }
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to fetch log {session_id}")
+                raise HTTPException(status_code=500, detail="Failed to fetch log. See server logs for details.")
 
         # Log deletion endpoints
         @self.app.delete("/api/logs/{session_id}")
@@ -745,8 +756,9 @@ class WebServer:
                 }
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to delete log {session_id}")
+                raise HTTPException(status_code=500, detail="Failed to delete log. See server logs for details.")
 
         @self.app.delete("/api/logs")
         async def delete_multiple_logs(request: Request):
@@ -768,8 +780,9 @@ class WebServer:
                 }
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Failed to delete logs")
+                raise HTTPException(status_code=500, detail="Failed to delete logs. See server logs for details.")
 
         @self.app.delete("/api/logs/cleanup")
         async def cleanup_old_logs(days_old: int = 90):
@@ -787,8 +800,9 @@ class WebServer:
                 }
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Failed to clean up old logs")
+                raise HTTPException(status_code=500, detail="Failed to clean up old logs. See server logs for details.")
 
         # Reports API endpoints
         @self.app.get("/api/reports")
@@ -797,8 +811,9 @@ class WebServer:
             try:
                 reports = self.session_manager.logger.get_reports(device_path, limit, offset)
                 return reports
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Failed to fetch reports")
+                raise HTTPException(status_code=500, detail="Failed to fetch reports. See server logs for details.")
 
         @self.app.get("/api/reports/{session_id}")
         async def get_report_by_session(session_id: str):
@@ -810,8 +825,9 @@ class WebServer:
                 return report
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to fetch report {session_id}")
+                raise HTTPException(status_code=500, detail="Failed to fetch report. See server logs for details.")
 
         @self.app.get("/api/reports/device/{device_path:path}")
         async def get_device_reports(device_path: str):
@@ -819,8 +835,9 @@ class WebServer:
             try:
                 reports = self.session_manager.logger.get_device_reports(device_path)
                 return reports
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception(f"Failed to fetch reports for {device_path}")
+                raise HTTPException(status_code=500, detail="Failed to fetch device reports. See server logs for details.")
 
         @self.app.get("/api/download{file_path:path}")
         async def download_report_file(file_path: str):
