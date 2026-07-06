@@ -4,6 +4,20 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.7.3] - 2026-07-07
+
+### Fixed
+- **`.deb` postinst no longer tries to enable a systemd service that was never packaged.**
+  `scripts/build_packages.sh`'s generated `postinst`/`prerm` unconditionally ran
+  `systemctl enable/disable/stop breaknwipe-daemon`, but the `.deb` package's file list only ever
+  ships `opt/breaknwipe` and the `usr/bin` entry points — no `breaknwipe-daemon.service` unit is
+  packaged (unlike `scripts/install.sh`'s manual `make install-system` path, which actually
+  generates that file). The stray `|| true` kept installs from failing, but every `apt install
+  breaknwipe` printed a confusing `Failed to enable unit: Unit file breaknwipe-daemon.service does
+  not exist.` warning. Removed the dead systemd enable/disable/stop/reload calls from the
+  `.deb`-only postinst/prerm/postrm scripts; BreakNWipe runs on demand
+  (`breaknwipe --interactive`/`--gui`), not as a background daemon, via the apt install path.
+
 ## [3.7.2] - 2026-07-07
 
 ### Changed

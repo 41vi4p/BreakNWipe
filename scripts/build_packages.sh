@@ -306,12 +306,6 @@ chmod 750 /etc/breaknwipe
 chmod 750 /var/log/breaknwipe
 chmod 750 /var/lib/breaknwipe
 
-# Enable and start service if systemd is available
-if command -v systemctl > /dev/null 2>&1; then
-    systemctl daemon-reload
-    systemctl enable breaknwipe-daemon || true
-fi
-
 # Shell completion, generated dynamically from the actual Click command tree
 # (cli/main.py pins prog_name='breaknwipe' so this works regardless of how
 # the vendored venv's python is invoked). /etc/bash_completion.d is
@@ -336,12 +330,6 @@ EOF
 # BreakNWipe pre-removal script
 
 set -e
-
-# Stop service if running
-if command -v systemctl > /dev/null 2>&1; then
-    systemctl stop breaknwipe-daemon || true
-    systemctl disable breaknwipe-daemon || true
-fi
 EOF
 
     # Post-removal script
@@ -372,11 +360,6 @@ case "$1" in
         rm -f /etc/bash_completion.d/breaknwipe
         ;;
 esac
-
-# Reload systemd if available
-if command -v systemctl > /dev/null 2>&1; then
-    systemctl daemon-reload || true
-fi
 EOF
 
     chmod +x "$scripts_dir"/*
