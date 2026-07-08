@@ -361,6 +361,83 @@ export interface RecoveryJobProgress {
 
 export const RECOVERY_JOB_TERMINAL = ["completed", "failed", "cancelled"];
 
+// ---- File shredder ----
+
+export interface DirEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size_bytes: number;
+  mtime: number | null;
+}
+
+export interface DirListing {
+  mount_point: string;
+  path: string;
+  parent: string | null;
+  entries: DirEntry[];
+}
+
+export interface ShredReliability {
+  partition: string;
+  fstype: string | null;
+  rotational: boolean | null;
+  reliable: boolean;
+  warnings: string[];
+}
+
+export interface ShredStartRequest {
+  partition: string;
+  paths: string[];
+  algorithm: string;
+  passes?: number | null;
+  encryption_layers?: number;
+  overwrite_algorithm?: string;
+  fast_mode?: boolean;
+}
+
+export type ShredJobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export interface ShredFileOutcome {
+  path: string;
+  success: boolean;
+  bytes_written: number;
+  passes_completed: number;
+  warnings: string[];
+  error: string | null;
+}
+
+export interface ShredJobResult {
+  partition: string;
+  requested: number;
+  shredded: number;
+  failed: number;
+  cancelled: boolean;
+  refused: boolean;
+  refusal_reason: string | null;
+  files: ShredFileOutcome[];
+}
+
+export interface ShredJobProgress {
+  job_id: string;
+  partition: string;
+  paths: string[];
+  algorithm: string;
+  status: ShredJobStatus;
+  current_file: string;
+  files_done: number;
+  total_files: number;
+  current_pass: number;
+  total_passes: number;
+  bytes_written: number;
+  total_bytes: number;
+  percent: number | null;
+  result: ShredJobResult | null;
+  error: string | null;
+}
+
+export const SHRED_JOB_TERMINAL = ["completed", "failed", "cancelled"];
+
 // URL to stream/preview a recovered file's raw bytes (used for <img>/<iframe>
 // preview and "Open in new tab" / download links).
 export function recoveryViewUrl(path: string): string {
@@ -457,4 +534,13 @@ export const api = {
   verifyErasureStatus: (jobId: string) => request<VerifyJobProgress>(`/api/verify/erasure/${jobId}`),
   verifyErasureCancel: (jobId: string) =>
     request<{ success: boolean }>(`/api/verify/erasure/${jobId}/cancel`, { method: "POST" }),
+  shredReliability: (partition: string) =>
+    request<ShredReliability>(`/api/shred/reliability?partition=${encodeURIComponent(partition)}`),
+  shredBrowse: (partition: string, path: string) =>
+    request<DirListing>(`/api/shred/browse?partition=${encodeURIComponent(partition)}&path=${encodeURIComponent(path)}`),
+  shredStart: (body: ShredStartRequest) =>
+    request<{ job_id: string }>("/api/shred/start", { method: "POST", body: JSON.stringify(body) }),
+  shredStatus: (jobId: string) => request<ShredJobProgress>(`/api/shred/${jobId}`),
+  shredCancel: (jobId: string) =>
+    request<{ success: boolean }>(`/api/shred/${jobId}/cancel`, { method: "POST" }),
 };

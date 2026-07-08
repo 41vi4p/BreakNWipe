@@ -3,6 +3,7 @@
 import {
   BookOpen,
   Trash2,
+  FileX2,
   FileSearch,
   ShieldCheck,
   HardDrive,
@@ -20,6 +21,7 @@ import { ALGORITHMS, CATEGORIES } from "@/lib/algorithms";
 const SECTIONS = [
   { id: "getting-started", label: "Getting started", icon: BookOpen },
   { id: "wipe", label: "Secure wipe", icon: Trash2 },
+  { id: "shred", label: "File shredder", icon: FileX2 },
   { id: "recover", label: "File recovery", icon: FileSearch },
   { id: "verify", label: "Verify erasure", icon: ShieldCheck },
   { id: "utility", label: "Disk utility", icon: HardDrive },
@@ -153,6 +155,31 @@ const CLI_COMMANDS: CliCommandDoc[] = [
     examples: [
       { comment: "NIST Purge a USB drive, verify, and issue a certificate", command: "sudo breaknwipe wipe -d /dev/sdb -a nist-purge --verify -c" },
       { comment: "Five random passes, but only simulate", command: "sudo breaknwipe wipe -d /dev/sdb -a random -p 5 --dry-run" },
+    ],
+  },
+  {
+    name: "shred",
+    synopsis: "sudo breaknwipe shred PARTITION FILES... [OPTIONS]",
+    description: (
+      <>
+        Securely overwrite and delete specific files on a <strong>mounted</strong> partition — the rest of the drive is
+        untouched. Files must be real regular files inside the partition&rsquo;s own mount point; symlinks are refused.
+        Asks for confirmation unless <DataValue>--force</DataValue> is given. On SSD/NVMe drives or copy-on-write
+        filesystems (btrfs, zfs), in-place overwrite cannot guarantee the original data is destroyed — a warning is
+        printed before shredding proceeds regardless.
+      </>
+    ),
+    options: [
+      {
+        flag: "--algorithm, -a NAME",
+        description:
+          "One of: nist-clear (default), nist-purge, dod-3pass, dod-7pass, gutmann, random, zeros, custom, or the REA family — see the Algorithm reference above",
+      },
+      { flag: "--force", description: "Skip the confirmation prompt — dangerous, for scripted use only" },
+    ],
+    examples: [
+      { comment: "Shred two files with a single zero pass", command: "sudo breaknwipe shred /dev/sdb1 /mnt/usb/secret.docx /mnt/usb/notes.txt -a zeros" },
+      { comment: "DoD 3-pass, no confirmation prompt", command: "sudo breaknwipe shred /dev/sdb1 /mnt/usb/secret.docx -a dod-3pass --force" },
     ],
   },
   {
@@ -535,6 +562,29 @@ sudo breaknwipe --list-devices  # quick device overview`}</CodeBlock>
             <Callout>
               Wiping a <strong>mounted</strong> or <strong>system</strong> disk is blocked or requires explicit force. To
               wipe the disk your OS runs from, boot from a live USB and run BreakNWipe there.
+            </Callout>
+          </Section>
+
+          {/* ---- Shred ---- */}
+          <Section id="shred" title="File shredder" icon={<FileX2 size={18} />}>
+            <P>
+              Securely overwrites and deletes specific files on a mounted drive, leaving everything else untouched —
+              for when you need to destroy a handful of sensitive files without wiping the whole disk.
+            </P>
+            <Steps
+              items={[
+                <>Open <strong>Shred</strong> and pick the device, then a mounted partition on it — shredding needs a mounted filesystem, the opposite of Wipe.</>,
+                <>Browse folders and use the search box to find what you want gone. Tick individual files, or <strong>Select all</strong> in the current folder — selections persist as you navigate between folders.</>,
+                <>Pick an overwrite algorithm, the same picker used by Wipe (Standard, REA crypto-erase, or Custom).</>,
+                <>Click <strong>Shred…</strong> and type &ldquo;shred&rdquo; to confirm. Progress streams live: current file, pass, and an overall percentage.</>,
+                <>Each file is overwritten in place pass-by-pass, then truncated, renamed, and deleted. Per-file results show what succeeded, what failed and why, and any hard-link warnings.</>,
+              ]}
+            />
+            <Callout tone="warning">
+              In-place overwrite can&rsquo;t be guaranteed to destroy data on <strong>SSD/NVMe</strong> drives
+              (wear-leveling may write new data to different physical cells) or on <strong>copy-on-write filesystems</strong>{" "}
+              like btrfs/zfs (a write never touches the original blocks). BreakNWipe detects both and shows a specific
+              warning — the shred still runs, but for guaranteed destruction on those cases, wipe the whole device instead.
             </Callout>
           </Section>
 

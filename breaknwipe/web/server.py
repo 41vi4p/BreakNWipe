@@ -27,11 +27,12 @@ from .models import (
     WebSocketMessage, WipeSessionStatus, PartitionModel, DeviceHealthModel,
     FsckCheckRequest, PartitionResizeRequest, LvExtendRequest,
     RecoveryScanRequest, RecoveryRestoreRequest, RecoveryDeepScanStartRequest,
-    ErasureCheckRequest
+    ErasureCheckRequest, DirListingModel, ShredReliabilityModel, ShredStartRequest
 )
 from .session_manager import WipeSessionManager
 from .recovery_manager import RecoverySessionManager
 from .verify_manager import VerifySessionManager
+from .shred_manager import ShredSessionManager
 from ..device.filesystem import list_partitions
 from ..device.health import get_device_health
 from ..device.fsck import FilesystemChecker
@@ -55,9 +56,11 @@ class WebServer:
         self.session_manager = WipeSessionManager()
         self.recovery_manager = RecoverySessionManager()
         self.verify_manager = VerifySessionManager()
+        self.shred_manager = ShredSessionManager()
         self.websocket_connections: Dict[str, List[WebSocket]] = {}
         self.recovery_ws_connections: Dict[str, List[WebSocket]] = {}
         self.verify_ws_connections: Dict[str, List[WebSocket]] = {}
+        self.shred_ws_connections: Dict[str, List[WebSocket]] = {}
         # Folders a recovery operation has actually written to in this server's
         # lifetime -- the only directories /api/recovery/view is allowed to read
         # from, so browsing recovered files can't be turned into an arbitrary
@@ -233,6 +236,83 @@ class WebServer:
         def verify_erasure_cancel_endpoint(job_id: str):
             """Stop a running erasure check early."""
             ok = self.verify_manager.cancel_job(job_id)
+            return JSONResponse(content={"success": ok})
+
+        @self.app.get("/api/shred/reliability", response_model=ShredReliabilityModel)
+        def shred_reliability_endpoint(partition: str):
+            """Whether in-place file overwrite can be trusted to destroy data
+            on this (mounted) partition -- SSD/NVMe wear-leveling and
+            copy-on-write filesystems (btrfs/zfs) both break that assumption.
+            Never refuses anything; the GUI shows this as a warning."""
+            try:
+                from ..device.shredder import assess_reliability
+                return assess_reliability(partition)
+            except Exception:
+                logger.exception(f"Shred reliability check failed for {partition}")
+                raise HTTPException(status_code=500, detail="Reliability check failed. See server logs for details.")
+
+        @self.app.get("/api/shred/browse", response_model=DirListingModel)
+        def shred_browse_endpoint(partition: str, path: str = ""):
+            """List a directory inside a mounted partition, for the file
+            shredder's browser. Read-only; path-containment is enforced in
+            shredder.list_directory (the client only ever supplies a path
+            relative to the partition's own mount point, never a root)."""
+            try:
+                from ..device.shredder import list_directory
+                return list_directory(partition, path).to_dict()
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except Exception:
+                logger.exception(f"Directory listing failed for {partition}:{path}")
+                raise HTTPException(status_code=500, detail="Directory listing failed. See server logs for details.")
+
+        @self.app.post("/api/shred/start")
+        def shred_start_endpoint(request: ShredStartRequest):
+            """Start a background job that overwrites and deletes the given
+            files (leaving the rest of the drive untouched) and return its
+            job_id immediately. Progress streams over WS /ws/shred/{job_id};
+            GET /api/shred/{job_id} polls the same state for reconnects."""
+            try:
+                algo_kwargs = {
+                    "passes": request.passes,
+                    "encryption_layers": request.encryption_layers,
+                    "overwrite_algorithm": request.overwrite_algorithm,
+                    "fast_mode": request.fast_mode,
+                }
+                job_id = self.shred_manager.start_shred(
+                    request.partition, request.paths, request.algorithm.value, algo_kwargs
+                )
+
+                def progress_callback(payload: Dict[str, Any]):
+                    try:
+                        if self.event_loop and not self.event_loop.is_closed():
+                            asyncio.run_coroutine_threadsafe(
+                                self._broadcast_shred_progress(job_id, payload), self.event_loop
+                            )
+                    except Exception as e:
+                        logger.debug(f"Failed to broadcast shred progress: {e}")
+
+                self.shred_manager.add_progress_callback(job_id, progress_callback)
+                return JSONResponse(content={"job_id": job_id})
+            except Exception:
+                logger.exception(f"Failed to start shred job for {request.partition}")
+                raise HTTPException(status_code=500, detail="Failed to start shred job. See server logs for details.")
+
+        @self.app.get("/api/shred/{job_id}")
+        def shred_status_endpoint(job_id: str):
+            """Current state of a shred job -- used to reconnect after
+            navigating away."""
+            job = self.shred_manager.get_job(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="Shred job not found.")
+            return JSONResponse(content=job.to_dict())
+
+        @self.app.post("/api/shred/{job_id}/cancel")
+        def shred_cancel_endpoint(job_id: str):
+            """Stop a running shred job early (files already fully processed
+            are not undone; the current file's in-progress pass may leave it
+            partially overwritten but not yet deleted)."""
+            ok = self.shred_manager.cancel_job(job_id)
             return JSONResponse(content={"success": ok})
 
         @self.app.get("/api/devices/{device_path:path}/sectors")
@@ -1030,6 +1110,38 @@ class WebServer:
                     except ValueError:
                         pass
 
+        @self.app.websocket("/ws/shred/{job_id}")
+        async def shred_websocket_endpoint(websocket: WebSocket, job_id: str):
+            """WebSocket endpoint for shred job progress."""
+            await websocket.accept()
+
+            if job_id not in self.shred_ws_connections:
+                self.shred_ws_connections[job_id] = []
+            self.shred_ws_connections[job_id].append(websocket)
+
+            try:
+                job = self.shred_manager.get_job(job_id)
+                if job:
+                    message = WebSocketMessage(type="shred_progress", session_id=job_id, data=job.to_dict())
+                    await websocket.send_text(message.json())
+
+                while True:
+                    try:
+                        await websocket.receive_text()
+                    except WebSocketDisconnect:
+                        break
+
+            except WebSocketDisconnect:
+                pass
+            finally:
+                if job_id in self.shred_ws_connections:
+                    try:
+                        self.shred_ws_connections[job_id].remove(websocket)
+                        if not self.shred_ws_connections[job_id]:
+                            del self.shred_ws_connections[job_id]
+                    except ValueError:
+                        pass
+
         @self.app.get("/api/health")
         async def health_check():
             """Health check endpoint."""
@@ -1176,6 +1288,26 @@ class WebServer:
         for client in disconnected_clients:
             try:
                 self.verify_ws_connections[job_id].remove(client)
+            except ValueError:
+                pass
+
+    async def _broadcast_shred_progress(self, job_id: str, data: Dict[str, Any]):
+        """Broadcast a shred job's progress to connected WebSocket clients."""
+        if job_id not in self.shred_ws_connections:
+            return
+
+        message = WebSocketMessage(type="shred_progress", session_id=job_id, data=data)
+
+        disconnected_clients = []
+        for websocket in self.shred_ws_connections[job_id]:
+            try:
+                await websocket.send_text(message.json())
+            except Exception:
+                disconnected_clients.append(websocket)
+
+        for client in disconnected_clients:
+            try:
+                self.shred_ws_connections[job_id].remove(client)
             except ValueError:
                 pass
 

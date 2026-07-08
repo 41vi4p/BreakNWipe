@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FileSearch, HardDrive, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowRight, FileSearch, FileX2, HardDrive, ShieldCheck, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { DataValue } from "@/components/ui";
@@ -22,6 +22,13 @@ const PILLARS: {
     icon: Trash2,
     title: "Wipe",
     description: "Erase a device with a standards-compliant algorithm and a signed, blockchain-anchored certificate.",
+  },
+  {
+    href: "/shred/",
+    tint: "danger",
+    icon: FileX2,
+    title: "Shred",
+    description: "Browse a device's files and securely destroy just the ones you pick, leaving the rest untouched.",
   },
   {
     href: "/recover/",

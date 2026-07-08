@@ -154,6 +154,44 @@ class RecoveryDeepScanStartRequest(BaseModel):
     output_dir: str = Field(..., description="Folder to carve recovered files into (must be on a different device)")
 
 
+class DirEntryModel(BaseModel):
+    """A single file or folder entry from the file-shredder's directory browser."""
+    name: str
+    path: str
+    is_dir: bool
+    size_bytes: int = 0
+    mtime: Optional[float] = None
+
+
+class DirListingModel(BaseModel):
+    """A directory's contents, for the file-shredder's browser."""
+    mount_point: str
+    path: str
+    parent: Optional[str] = None
+    entries: List[DirEntryModel] = Field(default_factory=list)
+
+
+class ShredReliabilityModel(BaseModel):
+    """Whether in-place file overwrite can be trusted to destroy data on this partition."""
+    partition: str
+    fstype: Optional[str] = None
+    rotational: Optional[bool] = None
+    reliable: bool
+    warnings: List[str] = Field(default_factory=list)
+
+
+class ShredStartRequest(BaseModel):
+    """Request to start a file-shredding job: overwrite and delete specific
+    files on a mounted partition, leaving the rest of the drive untouched."""
+    partition: str = Field(..., description="Mounted partition the files live on, e.g. /dev/sdb1")
+    paths: List[str] = Field(..., description="Absolute file paths to shred (as returned by the directory browser)")
+    algorithm: WipeAlgorithm = Field(..., description="Overwrite algorithm")
+    passes: Optional[int] = Field(default=None, description="Number of passes for the random algorithm")
+    encryption_layers: Optional[int] = Field(default=2, description="Number of encryption layers for REA Custom (1-7)")
+    overwrite_algorithm: Optional[str] = Field(default="nist-clear", description="Overwrite algorithm for REA Custom")
+    fast_mode: Optional[bool] = Field(default=False, description="Use fast mode for REA Custom encryption")
+
+
 class WipeRequest(BaseModel):
     """Request to start a wipe operation."""
     device_path: str = Field(..., description="Target device path")

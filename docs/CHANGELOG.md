@@ -4,6 +4,48 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.11.0] - 2026-07-08
+
+### Added
+- **File Shredder** — a new pillar (`/shred` in the GUI, `breaknwipe shred` on the CLI) that
+  securely overwrites and deletes specific files on a mounted drive, leaving the rest of it
+  untouched. Reuses the existing pass/pattern machinery (`wipe_engine.algorithms.create_algorithm`
+  — including the REA crypto-erase family, which is pure byte generation with no device
+  dependency) and the same seek/write/flush/fsync durability idiom as
+  `wipe_engine.engine.WipeEngine._execute_pass`, applied to a file's own byte range instead of a
+  device's.
+  - New `breaknwipe/device/shredder.py`: `list_directory()` (read-only browsing, mount-anchored),
+    `assess_reliability()` (SSD/NVMe wear-leveling and copy-on-write filesystem detection — see
+    below), and `shred_files()` (per-file overwrite + truncate + rename + unlink, mirroring GNU
+    `shred -u`'s hardening). Every file path is independently re-validated to resolve inside the
+    partition's own mount point on every call — defense in depth, never trusting that a path only
+    came from a prior directory listing (the same posture as the existing `/api/download`
+    allowlist and `recovered_roots` check). Symlinks are refused outright, checked on the raw,
+    unresolved path *before* any realpath resolution — an initial implementation checked the
+    already-resolved path instead, which silently followed the symlink and shredded its target
+    (inside or outside the mount) rather than refusing; caught and fixed via
+    `tests/test_shredder.py` before release. Hard-linked files are shredded but surface a warning
+    (other names pointing to the same data are also affected).
+  - **Honest reliability caveat, not a hard gate**: in-place overwrite can't be guaranteed to
+    destroy data on SSD/NVMe drives (wear-leveling may write to different physical cells) or on
+    copy-on-write filesystems (btrfs, zfs — a write never touches the original blocks). Both are
+    detected and surfaced as a specific warning in the GUI and CLI; the shred still proceeds,
+    matching the honest-limits stance the Recovery/Verify pillars already take about their own
+    boundaries.
+  - Web: `GET /api/shred/reliability`, `GET /api/shred/browse`, `POST /api/shred/start`,
+    `GET /api/shred/{job_id}`, `POST /api/shred/{job_id}/cancel`, `WS /ws/shred/{job_id}` — the
+    fourth near-identical background-job manager (`shred_manager.py`, copied from
+    `verify_manager.py`'s pattern) after wipe/recovery/verify. Deliberately not refactored into a
+    shared base class in this change — that's flagged as a separate, focused follow-up rather than
+    bundled with a feature addition.
+  - GUI: file browser with breadcrumb navigation, client-side search, `Set`-based multi-select
+    with select-all (persists across folder navigation), the same category→algorithm picker as
+    Wipe (extracted into a new shared `components/algorithm-picker.tsx`), a typed
+    (`"shred"`) confirmation dialog, live WebSocket progress, and a per-file results list.
+  - CLI: `breaknwipe shred PARTITION FILES... [--algorithm NAME] [--force]`.
+  - Scope: files only in this release — folders are browsable but not recursively shreddable
+    (a natural follow-up once the file-level path is proven).
+
 ## [3.10.0] - 2026-07-08
 
 ### Added

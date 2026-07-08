@@ -1,6 +1,7 @@
 # BreakNWipe → complete disk toolkit — roadmap
 
-**Status: Phases 1–4 all shipped.** This document is the roadmap for growing
+**Status: Phases 1–6 all shipped** (the header previously said 1–4, stale since Phase 5 landed;
+corrected here alongside adding Phase 6). This document is the roadmap for growing
 BreakNWipe from a secure-wipe utility into a general-purpose, genuinely usable disk toolkit — one
 that beats GParted / testdisk / GNOME-Disks on *approachability* while keeping the wipe + tamper-
 proof certificate as a flagship feature. The name stays **BreakNWipe**; positioning broadens.
@@ -92,6 +93,20 @@ became a horizontal top bar with those same four pillars as tabs, and `/wipe`/`/
 chosen elsewhere. (A separate `POST /api/verify/certificate` signature/blockchain-check endpoint was
 also built but is intentionally not linked from the GUI nav — it verifies certificate authenticity,
 a different concern from the Verify pillar's device-erasure check.)
+
+### Phase 6 — File Shredder ✅ shipped (v3.11.0)
+A new pillar that destroys individual files rather than a whole device: pick a mounted partition,
+browse/search its files in the GUI, multi-select, choose an overwrite algorithm, and only those
+files' bytes are overwritten (then truncated/renamed/unlinked). Reuses `wipe_engine.algorithms`'
+pass/pattern generation and `WipeEngine._execute_pass`'s seek/write/flush/fsync idiom, applied to a
+file's own length instead of a device's — the REA crypto-erase family works here too, since it's
+pure byte generation with no device dependency. New `device/shredder.py`, the fourth
+background-job manager (`web/shred_manager.py`, following `verify_manager.py`'s pattern — a shared
+base class was considered but deliberately deferred to its own follow-up rather than bundled with
+this feature), and a `breaknwipe shred` CLI command. Detects (and warns about, without blocking)
+the two cases where in-place overwrite can't guarantee destruction: SSD/NVMe wear-leveling and
+copy-on-write filesystems (btrfs, zfs) — same honest-limits framing as Verify/Recovery's own
+caveats. Scope: files only, not recursive folder-shredding (a natural Phase 7 candidate).
 
 ## Cross-cutting
 

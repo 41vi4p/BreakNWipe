@@ -536,6 +536,85 @@ def verify(device, depth):
 
 
 @main.command()
+@click.argument('partition', shell_complete=complete_device_path)
+@click.argument('files', nargs=-1, required=True)
+@click.option('--algorithm', '-a', type=click.Choice([a.value for a in AlgorithmType]),
+              default='nist-clear', help='Overwrite algorithm to use')
+@click.option('--force', is_flag=True, help='Skip the confirmation prompt (DANGEROUS)')
+def shred(partition, files, algorithm, force):
+    """Securely overwrite and delete specific FILES on a mounted PARTITION.
+
+    Unlike `wipe`, this destroys only the named files -- the rest of the
+    drive is untouched. FILES must be real, existing regular files inside
+    PARTITION's own mount point; symlinks are refused. Note: on SSD/NVMe
+    drives and copy-on-write filesystems (btrfs, zfs), in-place overwrite
+    cannot guarantee the original data is actually destroyed -- this is
+    reported, not hidden, but the shred still proceeds.
+    """
+    from ..device.shredder import shred_files, assess_reliability
+
+    abs_files = [os.path.abspath(f) for f in files]
+
+    reliability = assess_reliability(partition)
+    for warning in reliability['warnings']:
+        console.print(f"[yellow]⚠ {warning}[/yellow]")
+
+    console.print(f"About to shred [red]{len(abs_files)}[/red] file(s) on {partition} "
+                  f"using [cyan]{algorithm}[/cyan]:")
+    for f in abs_files[:20]:
+        console.print(f"  [dim]{f}[/dim]")
+    if len(abs_files) > 20:
+        console.print(f"  [dim]… and {len(abs_files) - 20} more[/dim]")
+
+    if not force:
+        if not click.confirm("This cannot be undone. Continue?"):
+            console.print("[yellow]Cancelled.[/yellow]")
+            return
+
+    from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
+
+    progress_bar = Progress(
+        TextColumn("[cyan]{task.description}"),
+        BarColumn(bar_width=40, complete_style="green", finished_style="green"),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    )
+    task_id = progress_bar.add_task("Shredding…", total=100)
+
+    def on_progress(payload):
+        percent = payload.get("percent")
+        if percent is not None:
+            progress_bar.update(task_id, completed=percent)
+        current_file = payload.get("current_file")
+        if current_file:
+            progress_bar.update(task_id, description=f"Shredding {os.path.basename(current_file)}…")
+
+    with progress_bar:
+        result = shred_files(partition, abs_files, algorithm, progress_callback=on_progress)
+        progress_bar.update(task_id, completed=100)
+
+    if result.refused:
+        console.print(f"[red]Refused:[/red] {result.refusal_reason}")
+        sys.exit(1)
+
+    for outcome in result.files:
+        if outcome.success:
+            console.print(f"[green]✓[/green] {outcome.path}")
+            for w in outcome.warnings:
+                console.print(f"  [yellow]⚠ {w}[/yellow]")
+        else:
+            console.print(f"[red]✗ {outcome.path}[/red] -- {outcome.error}")
+
+    console.print(f"\nShredded [green]{result.shredded}[/green]/{result.requested}"
+                  f"{f', [red]{result.failed}[/red] failed' if result.failed else ''}.")
+
+    if result.failed:
+        sys.exit(1)
+
+
+@main.command()
 def list_algorithms():
     """List all available wiping algorithms."""
 

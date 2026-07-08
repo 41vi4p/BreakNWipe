@@ -6,7 +6,7 @@
 
 **A complete, approachable disk toolkit — securely wipe drives with tamper-proof certificates, inspect health, manage partitions, and repair filesystems, all from one clean interface.**
 
-[![Version](https://img.shields.io/badge/version-3.10.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.11.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
@@ -117,6 +117,7 @@ And the result isn't just a wiped drive — it's **proof anyone can independentl
 - [x] **Hex / sector viewer** — read-only view of raw device bytes (hex + ASCII, sector boundaries, jump-to-offset) in the web GUI, wired into the post-wipe screen so you can *see* a drive is actually zeroed.
 - [x] **Deleted-file recovery** — undelete accidentally-deleted or quick-formatted files. A *quick scan* (The Sleuth Kit) recovers files **with their original names** on NTFS/FAT/exFAT (USB sticks, SD cards, Windows drives); a *deep scan* (PhotoRec) carves file contents by type even from ext4 or damaged drives, with live progress/ETA and in-GUI preview of what came back. Simple browse-and-select GUI at `/recover`, a `breaknwipe recover <partition>` CLI command, and an honest reminder that a securely-wiped drive has nothing to recover. Recovery always writes to a **different** drive so it can't overwrite what it's reading.
 - [x] **Verify erasure** — confirm a device has actually been wiped clean: read-only sampling of the raw drive (entropy, repeated patterns, known file signatures) at quick/comprehensive/paranoid depth, plus a cross-check against the recovery scan. Runs as a background job with a live progress bar, ETA, and a Cancel button in the GUI (`/verify`); a Rich progress bar on the CLI (`breaknwipe verify <device>`).
+- [x] **File shredder** — destroy individual files instead of a whole device: browse/search a mounted partition's files in the GUI, multi-select, pick an overwrite algorithm (the same NIST/DoD/Gutmann/REA set as Wipe), and only those files' bytes are overwritten, then truncated/renamed/deleted. Detects — and honestly warns about, without blocking — the two cases where in-place overwrite can't guarantee destruction: SSD/NVMe wear-leveling and copy-on-write filesystems (btrfs, zfs). GUI at `/shred`; CLI via `breaknwipe shred <partition> <files...>`.
 
 #### Certification & Verification
 - [x] **Digitally signed PDF certificates** (RSA / X.509)

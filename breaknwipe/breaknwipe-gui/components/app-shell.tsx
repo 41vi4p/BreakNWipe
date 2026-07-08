@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Trash2, FileSearch, ShieldCheck, HardDrive, ScrollText, FileCheck2, Info, CircleHelp } from "lucide-react";
+import { Trash2, FileX2, FileSearch, ShieldCheck, HardDrive, ScrollText, FileCheck2, Info, CircleHelp } from "lucide-react";
 import { ThemeToggle } from "./theme";
 
 type Tint = "danger" | "info" | "success" | "primary";
 
 const PILLARS: { href: string; label: string; icon: typeof Trash2; tint: Tint; match: (p: string) => boolean }[] = [
   { href: "/wipe/", label: "Wipe", icon: Trash2, tint: "danger", match: (p) => p.startsWith("/wipe") },
+  { href: "/shred/", label: "Shred", icon: FileX2, tint: "danger", match: (p) => p.startsWith("/shred") },
   { href: "/recover/", label: "Recover", icon: FileSearch, tint: "info", match: (p) => p.startsWith("/recover") },
   { href: "/verify/", label: "Verify", icon: ShieldCheck, tint: "success", match: (p) => p.startsWith("/verify") },
   {
