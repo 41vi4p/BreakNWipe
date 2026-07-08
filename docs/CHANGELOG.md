@@ -4,6 +4,35 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.9.0] - 2026-07-08
+
+### Added
+- **Docker image** — pull, attach a drive, use the web GUI from the host browser; nothing
+  installed on the host. New root-level `Dockerfile` (multi-stage: Node 20 builds the Next.js
+  static bundle; `uv sync --no-dev --managed-python` vendors Python + deps at `/opt/breaknwipe`,
+  the exact layout/paths of `scripts/build_packages.sh` since uv bakes absolute paths; runtime is
+  Ubuntu 24.04 + only the system tools the engine shells out to — including `e2fsprogs`,
+  `dosfstools`, `exfatprogs`, which `device/fsck.py` needs but the `.deb` dependency list never
+  declared). ENTRYPOINT is the CLI with the GUI (`--gui --host 0.0.0.0 --port 8000`) as the
+  default CMD, so `docker run ... breaknwipe --list-devices` and friends also work. gparted and
+  adb/fastboot deliberately not installed (headless container; both features self-disable via
+  their `shutil.which` guards).
+- **`docker-compose.yml`** — one-command GUI run (privileged, `/dev` + `/run/udev` binds, named
+  volume persisting `/root/breaknwipe_reports`).
+- **`.github/workflows/docker-image.yml`** — builds linux/amd64 + linux/arm64 via buildx/QEMU and
+  pushes `:X.Y.Z`, `:X.Y`, `:latest` to Docker Hub on every `v*` tag push. Requires
+  `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` repo secrets, set up manually per `docs/DOCKER.md`
+  (same stance as the APT repo's GPG key: credentials are never handled by scripts).
+- **`docs/DOCKER.md`** — usage + an honest per-platform support matrix: **Linux** full device
+  access (`--privileged -v /dev:/dev`, or scoped `--device /dev/sdX` for overwrite-only wiping);
+  **Windows** USB drives only, forwarded into the WSL2 VM with `usbipd-win` (internal SATA/NVMe
+  never visible; attach doesn't survive replug); **macOS** no device access at all (Docker
+  Desktop's VM has no block/USB passthrough) — container runs as a UI/API demo only. Also covers
+  report persistence, blockchain `.env` mounting, the no-auth-on-port-8000 warning, and the
+  one-time Docker Hub maintainer setup.
+- `make docker-build` / `make docker-run` targets; `.dockerignore`; README Docker install
+  section + badge.
+
 ## [3.8.0] - 2026-07-07
 
 ### Added

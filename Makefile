@@ -1,6 +1,8 @@
 # BreakNWipe Development Makefile
 
-.PHONY: help install dev-install test lint format clean build package install-system uninstall-system demo
+.PHONY: help install dev-install test lint format clean build package install-system uninstall-system demo docker-build docker-run
+
+VERSION := $(shell grep -oP "(?<=__version__ = ')[^']+" breaknwipe/__init__.py)
 
 help:
 	@echo "BreakNWipe Development Commands:"
@@ -15,6 +17,8 @@ help:
 	@echo "  install-system   - Install BreakNWipe system-wide"
 	@echo "  uninstall-system - Remove BreakNWipe from system"
 	@echo "  demo             - Run demonstration"
+	@echo "  docker-build     - Build the Docker image (breaknwipe:VERSION + :latest)"
+	@echo "  docker-run       - Run the GUI container (privileged, /dev, port 8000)"
 
 install:
 	uv sync --no-dev
@@ -58,6 +62,15 @@ uninstall-system:
 	@echo "Removing BreakNWipe from system..."
 	chmod +x scripts/uninstall.sh
 	sudo ./scripts/uninstall.sh
+
+# Docker (see docs/DOCKER.md for per-platform usage and limitations)
+docker-build:
+	docker build -t breaknwipe:$(VERSION) -t breaknwipe:latest .
+
+docker-run:
+	docker run --rm --privileged -v /dev:/dev -v /run/udev:/run/udev:ro \
+		-p 8000:8000 -v breaknwipe-reports:/root/breaknwipe_reports \
+		breaknwipe:latest
 
 # Development shortcuts
 run-interactive:

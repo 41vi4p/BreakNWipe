@@ -6,10 +6,11 @@
 
 **A complete, approachable disk toolkit — securely wipe drives with tamper-proof certificates, inspect health, manage partitions, and repair filesystems, all from one clean interface.**
 
-[![Version](https://img.shields.io/badge/version-3.8.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.9.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)
+[![Docker](https://img.shields.io/badge/Docker-multi--arch-2496ED.svg?logo=docker&logoColor=white)](docs/DOCKER.md)
 [![Next.js GUI](https://img.shields.io/badge/GUI-Next.js%20%2B%20FastAPI-000000.svg?logo=next.js&logoColor=white)](#%EF%B8%8F-user-interfaces)
 [![Solidity](https://img.shields.io/badge/Solidity-Sepolia%20Testnet-363636.svg?logo=solidity&logoColor=white)](#-blockchain-verification)
 [![NIST SP 800-88](https://img.shields.io/badge/NIST-SP%20800--88-orange.svg)](#-standards-compliance)
@@ -161,6 +162,17 @@ sudo apt install breaknwipe
 ```
 
 The package is fully self-contained (BreakNWipe + all its Python dependencies are vendored into a `uv`-managed virtual environment at build time), so it doesn't pull in a web of `python3-*` system packages — just the device tools BreakNWipe actually shells out to (`hdparm`, `nvme-cli`, `smartmontools`, `util-linux`). Built and published by [`.github/workflows/apt-repo.yml`](.github/workflows/apt-repo.yml) on every tagged release; see [`docs/APT_REPO_SETUP_GUIDE.md`](docs/APT_REPO_SETUP_GUIDE.md) for the one-time maintainer setup.
+
+**Docker (no install at all)** — pull the image, attach a drive, use the web GUI from your host browser. Everything (backend, GUI, all device tools) is baked in:
+
+```bash
+docker run --rm --privileged -v /dev:/dev -v /run/udev:/run/udev:ro \
+  -p 8000:8000 -v breaknwipe-reports:/root/breaknwipe_reports \
+  41vi4p/breaknwipe:latest
+# then open http://localhost:8000
+```
+
+Full device access on **Linux** hosts; on **Windows**, USB drives work via [usbipd-win](https://github.com/dorssel/usbipd-win); on **macOS**, Docker's VM has no device passthrough, so the container runs as a UI/API demo only. Platform details, single-drive scoping, compose usage, and CLI-mode invocation: [`docs/DOCKER.md`](docs/DOCKER.md).
 
 **One-liner script** — clones the repo and runs the full system installer (dedicated user, systemd service, `breaknwipe`/`bwipe` commands on PATH). As with any curl-to-bash installer, review the script before piping it into a root shell:
 

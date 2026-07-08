@@ -1,0 +1,30 @@
+# BreakNWipe -- run the web GUI in a container with physical drive access.
+#
+#   docker compose up            # uses the published image
+#   docker compose up --build    # or build locally from this checkout
+#
+# Then open http://localhost:8000 on the host. See docs/DOCKER.md for
+# per-platform support (full device access on Linux; USB drives only on
+# Windows via usbipd-win; no device access on macOS -- UI/API demo only).
+
+services:
+  breaknwipe:
+    image: 41vi4p/breaknwipe:latest
+    build: .
+    container_name: breaknwipe
+    # Wiping talks to raw block devices (ioctls, SG_IO, hdparm/nvme admin
+    # commands) -- privileged is the practical requirement. To scope access to
+    # a single drive instead, drop `privileged` + the /dev bind and use:
+    #   devices: ["/dev/sdX:/dev/sdX"]
+    # (hardware secure-erase paths may still need privileged).
+    privileged: true
+    ports:
+      - "8000:8000"
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro   # udev database for device detection (pyudev)
+      - breaknwipe-reports:/root/breaknwipe_reports
+    restart: unless-stopped
+
+volumes:
+  breaknwipe-reports:

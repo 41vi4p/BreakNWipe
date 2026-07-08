@@ -1,0 +1,57 @@
+# Keep the build context lean. Note: uv.lock and
+# breaknwipe/breaknwipe-gui/package-lock.json MUST stay in the context
+# (uv sync / npm ci need them).
+
+.git
+.github
+.gitignore
+
+# Python build/runtime artifacts
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+**/*.egg-info
+.venv
+venv
+env
+build
+dist
+htmlcov
+.pytest_cache
+.mypy_cache
+.coverage
+
+# Node artifacts (GUI is rebuilt fresh inside the image)
+**/node_modules
+**/.next
+**/out
+
+# Separate Hardhat project -- not part of the Python package, never needed in
+# the image (the contract is already deployed; the Python side talks to it
+# over RPC via web3).
+blockchain
+
+# Secrets -- never bake credentials into an image layer
+.env
+**/.env
+**/.env.*
+!**/.env.example
+
+# Packages / heavy docs assets
+*.deb
+*.rpm
+docs/presentation*
+recover
+reports
+*.log
+
+# OS / editor
+.DS_Store
+.idea
+.vscode
+
+# Docker files themselves (not needed inside the context)
+Dockerfile
+docker-compose.yml
+.dockerignore

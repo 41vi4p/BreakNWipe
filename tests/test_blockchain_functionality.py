@@ -8,7 +8,7 @@ This script tests:
 3. QR code generation with blockchain data
 4. Certificate generation with blockchain integration
 """
-
+#uv run python -m breaknwipe.cli.main --gui
 import sys
 import os
 import json
