@@ -128,6 +128,14 @@ class CertificateGenerator:
             except Exception as e:
                 logger.error(f"Failed to generate {format_type.value} certificate: {e}")
 
+        # The PDF build writes a standalone QR PNG next to the certificate
+        # (qr_<report_id>.png); surface its path so callers (web session
+        # manager, reports DB) can serve/link the image directly.
+        if include_qr:
+            qr_png_path = self.output_directory / f"qr_{report.report_id}.png"
+            if qr_png_path.exists():
+                generated_files['qr_png'] = str(qr_png_path)
+
         return generated_files
 
     def _initialize_signing_keys(self):

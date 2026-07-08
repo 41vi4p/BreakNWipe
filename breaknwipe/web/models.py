@@ -201,6 +201,13 @@ class WipeSession(BaseModel):
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     certificate_path: Optional[str] = Field(default=None, description="Path to generated certificate")
     report_id: Optional[str] = Field(default=None, description="Generated report ID for consistency")
+    # NOTE: these must be declared here -- WipeSession is a pydantic model, so
+    # assigning an undeclared attribute raises. An earlier version set
+    # session.qr_data dynamically; that assignment silently failed inside the
+    # certificate try/except and aborted report storage every time.
+    qr_data: Optional[str] = Field(default=None, description="QR payload JSON generated for the certificate")
+    verification_passed: Optional[bool] = Field(default=None, description="Post-wipe verification outcome (None = not run)")
+    certificate_files: Optional[Dict[str, Any]] = Field(default=None, description="Generated certificate artifacts (pdf/json/qr_png/blockchain_result)")
 
 
 class ApiResponse(BaseModel):

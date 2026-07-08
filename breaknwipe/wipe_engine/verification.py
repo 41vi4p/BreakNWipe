@@ -285,6 +285,26 @@ class WipeVerifier:
         if len(data) == 0:
             return False
 
+        # Uniform fill (all-zeros / all-0xFF) is the signature of a successful
+        # wipe pass, not recoverable data. This must short-circuit BEFORE the
+        # structured-pattern check below: on an all-zeros sample every byte is
+        # a "null position" with perfectly regular gaps, which that heuristic
+        # flags as structured data -- making a correctly zeroed device fail
+        # verification 100% of the time.
+        if data.count(0) / len(data) >= 0.9 or data.count(255) / len(data) >= 0.9:
+            return False
+
+        # High-entropy data is what a random-fill (or REA crypto-erase) pass
+        # leaves behind -- indistinguishable from random, with no recoverable
+        # structure these heuristics could detect. Without this short-circuit
+        # the text-pattern check below flags virtually every random sample
+        # ('@' + '.' or >3 '/' characters occur by chance in almost any 4 KiB
+        # of random bytes), making random wipes fail verification always.
+        # Known file formats in high-entropy data (JPEG/ZIP/...) are still
+        # caught by the separate _check_file_signatures() pass.
+        if self._calculate_entropy(data) >= 7.5:
+            return False
+
         # Check for common text patterns
         if self._contains_text_patterns(data):
             return True

@@ -31,6 +31,7 @@ docker run --rm \
   -v /run/udev:/run/udev:ro \
   -p 8000:8000 \
   -v breaknwipe-reports:/root/breaknwipe_reports \
+  -v breaknwipe-history:/root/.breaknwipe \
   41vi4p/breaknwipe:latest
 ```
 
@@ -45,6 +46,9 @@ Then open **http://localhost:8000**.
 - `-v breaknwipe-reports:/root/breaknwipe_reports` — persists wipe
   certificates/reports across container runs. Omit it and reports vanish with
   the container.
+- `-v breaknwipe-history:/root/.breaknwipe` — persists the wipe-history/audit
+  SQLite database (what the GUI's Reports and Logs pages read). Without it,
+  the Reports page starts empty on every new container.
 
 **Scoping to a single drive** (safer — the container can only see what you
 hand it):

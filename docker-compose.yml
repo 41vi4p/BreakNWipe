@@ -24,7 +24,9 @@ services:
       - /dev:/dev
       - /run/udev:/run/udev:ro   # udev database for device detection (pyudev)
       - breaknwipe-reports:/root/breaknwipe_reports
+      - breaknwipe-history:/root/.breaknwipe   # wipe-history/audit SQLite DB
     restart: unless-stopped
 
 volumes:
   breaknwipe-reports:
+  breaknwipe-history:

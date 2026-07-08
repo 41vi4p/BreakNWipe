@@ -321,7 +321,13 @@ class WipeSessionManager:
             if not hasattr(session, 'report_id') or not session.report_id:
                 session.report_id = f"BNW-{session_id[:8]}-{int(time.time())}"
 
+            # Expose the verification outcome to the API/GUI (None = not run)
+            session.verification_passed = (
+                result.verification_passed if session.wipe_request.verify else None
+            )
+
             # Generate certificate if requested
+            cert_files = None
             if session.wipe_request.generate_certificate and result.success:
                 try:
                     # Import here to avoid circular imports
@@ -393,6 +399,9 @@ class WipeSessionManager:
                         store_on_blockchain=store_on_blockchain
                     )
                     session.certificate_path = cert_files.get('pdf', '')
+                    # Full artifact map (pdf/json/qr_png/blockchain_result) for
+                    # the wipe-report API endpoint
+                    session.certificate_files = cert_files
 
                     # Store the QR data that was generated for the certificate
                     blockchain_result = cert_files.get('blockchain_result')
@@ -406,36 +415,44 @@ class WipeSessionManager:
                         else:
                             logger.error(f"Failed to upload to blockchain: {blockchain_result.get('error', 'Unknown error')}")
 
-                    # Store report in database
-                    try:
-                        # Prepare report data for storage
-                        report_data = {
-                            'device_path': session.device_info.path,
-                            'device_model': session.device_info.model,
-                            'device_serial': session.device_info.serial,
-                            'algorithm_used': result.algorithm_used,
-                            'wipe_method': 'software',
-                            'start_time': result.start_time,
-                            'end_time': result.end_time,
-                            'total_passes': result.total_passes,
-                            'success': result.success,
-                            'total_bytes_written': result.total_bytes_written,
-                            'average_speed_mbps': result.average_speed_mbps,
-                            'organization': 'BreakNWipe by CodeBreakers',
-                            'operator': 'System User'
-                        }
-
-                        # Store the report with certificate files
-                        self.logger.store_wipe_report(
-                            session_id=session_id,
-                            report_data=report_data,
-                            certificate_files=cert_files
-                        )
-                    except Exception as e:
-                        print(f"Failed to store report in database: {e}")
-
                 except Exception as e:
                     print(f"Certificate generation failed: {e}")
+                    cert_files = None
+
+            # Store report in database -- for EVERY finished wipe, certificate
+            # or not (previously this only ran inside the certificate branch,
+            # so certificate-less or cert-failed wipes never appeared on the
+            # Reports page).
+            try:
+                report_data = {
+                    'report_id': session.report_id,
+                    'device_path': session.device_info.path,
+                    'device_model': session.device_info.model,
+                    'device_serial': session.device_info.serial,
+                    'algorithm_used': result.algorithm_used,
+                    'wipe_method': 'software',
+                    'start_time': result.start_time,
+                    'end_time': result.end_time,
+                    'total_passes': result.total_passes,
+                    'success': result.success,
+                    'total_bytes_written': result.total_bytes_written,
+                    'average_speed_mbps': result.average_speed_mbps,
+                    'organization': 'BreakNWipe by CodeBreakers',
+                    'operator': 'System User'
+                }
+
+                qr_db_data = None
+                if cert_files and cert_files.get('qr_png'):
+                    qr_db_data = {'image_path': cert_files['qr_png']}
+
+                self.logger.store_wipe_report(
+                    session_id=session_id,
+                    report_data=report_data,
+                    certificate_files=cert_files,
+                    qr_data=qr_db_data
+                )
+            except Exception as e:
+                print(f"Failed to store report in database: {e}")
 
             # Log wipe completion
             try:

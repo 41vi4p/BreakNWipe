@@ -6,7 +6,7 @@
 
 **A complete, approachable disk toolkit — securely wipe drives with tamper-proof certificates, inspect health, manage partitions, and repair filesystems, all from one clean interface.**
 
-[![Version](https://img.shields.io/badge/version-3.9.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.10.0-blue.svg)](docs/CHANGELOG.md)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#)

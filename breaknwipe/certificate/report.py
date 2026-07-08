@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
 
+from .. import __version__
+
 
 class ReportFormat(Enum):
     """Supported report formats."""
@@ -110,7 +112,7 @@ class WipeReport:
     certificate_hash: Optional[str] = None
 
     # Additional metadata
-    software_version: str = "BreakNWipe 1.0"
+    software_version: str = field(default_factory=lambda: __version__)
     system_info: Dict[str, Any] = field(default_factory=dict)
     environment_info: Dict[str, Any] = field(default_factory=dict)
     custom_fields: Dict[str, Any] = field(default_factory=dict)
@@ -375,7 +377,10 @@ class WipeReport:
 
         # System info
         system_data = data.get('system_info', {})
-        report.software_version = system_data.get('software_version', 'BreakNWipe 1.0')
+        # Deliberately NOT defaulted to the current version: when re-loading an
+        # uploaded/old report for verification, claiming today's version would
+        # misrepresent what actually generated it.
+        report.software_version = system_data.get('software_version', 'unknown')
         report.system_info = system_data.get('system_info', {})
         report.environment_info = system_data.get('environment_info', {})
 

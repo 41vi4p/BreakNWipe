@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -15,13 +15,15 @@ import {
   ShieldCheck,
   KeyRound,
   SlidersHorizontal,
+  FileCheck2,
+  ExternalLink,
 } from "lucide-react";
-import { api, apiUrl, WIPE_TERMINAL, type DeviceInfo, type WipeProgressState } from "@/lib/api";
+import { api, apiUrl, downloadUrl, WIPE_TERMINAL, type DeviceInfo, type WipeProgressState, type WipeReportDetails } from "@/lib/api";
 import { ALGORITHMS, CATEGORIES, algorithmLabel, algorithmGroup, type AlgorithmGroup } from "@/lib/algorithms";
 import { useAsync, useQueryParam } from "@/lib/hooks";
 import { useWebSocket } from "@/lib/use-websocket";
-import { formatBytes, formatDuration } from "@/lib/format";
-import { Button, Card, CardHeader, DataValue, ErrorState, PageTitle, ProgressBar, Spinner, Badge } from "@/components/ui";
+import { formatBytes, formatDate, formatDuration } from "@/lib/format";
+import { Button, Card, CardHeader, DataValue, ErrorState, PageTitle, ProgressBar, Spinner, Badge, StatTile } from "@/components/ui";
 import { ConfirmDialog } from "@/components/dialog";
 import { DevicePicker } from "@/components/device-picker";
 
@@ -66,6 +68,22 @@ function WipePageInner() {
   const { last } = useWebSocket<{ type: string; data: WipeProgress }>(sessionId ? `/ws/${sessionId}` : null);
   const progress = last?.data ?? seed;
   const configurable = ALGORITHMS.find((a) => a.value === algorithm)?.configurablePasses;
+  const succeeded = progress?.status === "completed";
+
+  // Rich results (device details, certificate artifacts, QR, blockchain
+  // anchor) — fetched once the wipe reports completed.
+  const [report, setReport] = useState<WipeReportDetails | null>(null);
+  useEffect(() => {
+    if (!sessionId || !succeeded) return;
+    let alive = true;
+    api
+      .wipeReport(sessionId)
+      .then((r) => alive && setReport(r))
+      .catch(() => {}); // fall back to the minimal completion row
+    return () => {
+      alive = false;
+    };
+  }, [sessionId, succeeded]);
 
   // On load, reconnect to an in-progress (or the latest) wipe for this device —
   // so navigating away and back doesn't lose the running wipe.
@@ -166,6 +184,7 @@ function WipePageInner() {
     setSeed(null);
     setStartError(null);
     setCategory(null);
+    setReport(null);
   }
 
   function chooseCategory(id: AlgorithmGroup) {
@@ -177,7 +196,6 @@ function WipePageInner() {
   }
 
   const done = progress && WIPE_TERMINAL.includes(progress.status);
-  const succeeded = progress?.status === "completed";
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -371,7 +389,7 @@ function WipePageInner() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {certificate && succeeded && (
+                  {certificate && succeeded && !report && (
                     <a href={apiUrl(`/api/wipe/download/${sessionId}`)} target="_blank" rel="noreferrer">
                       <Button variant="secondary" size="sm">
                         <Download size={15} /> Download certificate
@@ -400,6 +418,118 @@ function WipePageInner() {
         </Card>
       )}
 
+      {succeeded && report && (
+        <>
+          <Card>
+            <CardHeader
+              title="Wipe results"
+              action={
+                report.verification.enabled ? (
+                  <Badge tone={report.verification.passed ? "success" : report.verification.passed === false ? "danger" : "neutral"}>
+                    {report.verification.passed
+                      ? "verification passed"
+                      : report.verification.passed === false
+                        ? "verification failed"
+                        : "verification pending"}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">verification not run</Badge>
+                )
+              }
+            />
+            <div className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StatTile
+                  label="Algorithm"
+                  value={<span className="text-base">{algorithmLabel(report.wipe_details.algorithm)}</span>}
+                  hint={`${report.wipe_details.total_passes} pass${report.wipe_details.total_passes === 1 ? "" : "es"}`}
+                />
+                <StatTile label="Duration" value={formatDuration(report.results.duration_seconds)} hint={`finished ${formatDate(report.results.completed_at)}`} />
+                <StatTile label="Data wiped" value={formatBytes(report.results.data_processed_bytes)} hint={`avg ${report.results.average_speed_mbps.toFixed(1)} MB/s`} />
+                <StatTile
+                  label="Verification"
+                  tone={report.verification.enabled ? (report.verification.passed ? "success" : "danger") : undefined}
+                  value={
+                    <span className="text-base">
+                      {report.verification.enabled ? (report.verification.passed ? "Passed" : "Failed") : "Not run"}
+                    </span>
+                  }
+                  hint="read-back sampling"
+                />
+              </div>
+              <dl className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                <DetailRow label="Device" value={<DataValue>{report.device.path}</DataValue>} />
+                <DetailRow label="Model" value={report.device.model || "—"} />
+                <DetailRow label="Serial number" value={<DataValue>{report.device.serial || "—"}</DataValue>} />
+                <DetailRow label="Capacity" value={<DataValue>{report.device.capacity}</DataValue>} />
+                <DetailRow label="Interface / type" value={`${report.device.interface || "—"} · ${report.device.device_type || "—"}`} />
+                <DetailRow label="Report ID" value={<DataValue>{report.report_id}</DataValue>} />
+              </dl>
+            </div>
+          </Card>
+
+          {report.certificate && (
+            <Card>
+              <CardHeader
+                title="Certificate of destruction"
+                action={report.blockchain ? <Badge tone="success">blockchain-anchored</Badge> : undefined}
+              />
+              <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start">
+                {report.certificate.qr_png_path && (
+                  <div className="flex shrink-0 flex-col items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- static-export SPA, API-served image */}
+                    <img
+                      src={downloadUrl(report.certificate.qr_png_path)}
+                      alt="Certificate verification QR code"
+                      className="h-40 w-40 rounded-lg border border-border bg-white p-2"
+                    />
+                    <span className="text-xs text-fg-muted">Scan to verify</span>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 space-y-4">
+                  <p className="text-sm leading-relaxed text-fg-muted">
+                    A digitally signed certificate was generated for this wipe. The QR code lets anyone
+                    verify its authenticity{report.blockchain ? ", cross-checked against the Sepolia blockchain anchor" : ""}.
+                  </p>
+                  {report.blockchain?.tx_hash && (
+                    <div className="rounded-lg border border-border bg-surface-2/50 px-4 py-3 text-sm">
+                      <div className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">Blockchain transaction</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <DataValue className="truncate text-fg">{report.blockchain.tx_hash}</DataValue>
+                        {report.blockchain.explorer_url && (
+                          <a
+                            href={report.blockchain.explorer_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          >
+                            <ExternalLink size={13} /> Etherscan
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <a href={apiUrl(`/api/wipe/download/${sessionId}`)} target="_blank" rel="noreferrer">
+                      <Button variant="secondary" size="sm">
+                        <Download size={15} /> Certificate PDF
+                      </Button>
+                    </a>
+                    {report.certificate.json_path && (
+                      <a href={downloadUrl(report.certificate.json_path)} target="_blank" rel="noreferrer">
+                        <Button variant="secondary" size="sm">
+                          <FileCheck2 size={15} /> JSON report
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -416,6 +546,15 @@ function WipePageInner() {
           </>
         }
       />
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 bg-surface px-4 py-2.5 text-sm">
+      <dt className="shrink-0 text-fg-muted">{label}</dt>
+      <dd className="min-w-0 truncate text-right text-fg">{value}</dd>
     </div>
   );
 }

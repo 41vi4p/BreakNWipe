@@ -160,6 +160,69 @@ export interface WipeSessionSummary {
 
 export const WIPE_TERMINAL = ["completed", "failed", "cancelled"];
 
+// Rich post-completion report from GET /api/wipe/report/{session_id}.
+export interface WipeReportDetails {
+  session_id: string;
+  report_id: string;
+  device: {
+    path: string;
+    model: string;
+    serial: string;
+    capacity: string;
+    capacity_bytes: number;
+    interface: string;
+    device_type: string;
+  };
+  wipe_details: {
+    algorithm: string;
+    total_passes: number;
+    verification_enabled: boolean;
+    certificate_generated: boolean;
+  };
+  results: {
+    status: string;
+    progress_percent: number;
+    data_processed_bytes: number;
+    average_speed_mbps: number;
+    duration_seconds: number;
+    started_at: string | null;
+    completed_at: string;
+  };
+  verification: { enabled: boolean; passed: boolean | null };
+  certificate: { pdf_path: string | null; json_path: string | null; qr_png_path: string | null } | null;
+  blockchain: { tx_hash: string | null; report_hash: string | null; explorer_url: string | null } | null;
+  certificate_path: string | null;
+  qr_data: string | null;
+}
+
+// A stored wipe record from GET /api/reports (SQLite wipe_reports row).
+export interface WipeReportRecord {
+  id: number;
+  session_id: string;
+  report_id: string;
+  device_path: string;
+  device_model: string;
+  device_serial: string;
+  algorithm_used: string;
+  wipe_method: string;
+  start_time: number | null;
+  end_time: number | null;
+  total_passes: number;
+  success: number | boolean;
+  total_bytes_written: number;
+  average_speed_mbps: number;
+  certificate_pdf_path?: string | null;
+  certificate_json_path?: string | null;
+  qr_code_image_path?: string | null;
+  created_at?: string;
+}
+
+// URL to download a server-side file (certificate PDF/JSON, QR PNG) via the
+// allowlisted /api/download endpoint.
+export function downloadUrl(absPath: string): string {
+  return apiUrl(`/api/download${absPath}`);
+}
+
 export interface DiskPartitionGeom {
   node: string;
   number: number;
@@ -371,7 +434,7 @@ export const api = {
   wipeSessions: () => request<WipeSessionSummary[]>("/api/wipe/sessions"),
   wipeCancel: (sessionId: string) =>
     request<ApiResponse>(`/api/wipe/cancel/${sessionId}`, { method: "POST" }),
-  wipeReport: (sessionId: string) => request<Record<string, unknown>>(`/api/wipe/report/${sessionId}`),
+  wipeReport: (sessionId: string) => request<WipeReportDetails>(`/api/wipe/report/${sessionId}`),
   logs: (params?: Record<string, string | number>) => {
     const q = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
     return request<Record<string, unknown>>(`/api/logs${q}`);
@@ -387,7 +450,7 @@ export const api = {
     request<RecoveryJobProgress>(`/api/recovery/deep-scan/${jobId}`),
   recoveryDeepScanCancel: (jobId: string) =>
     request<{ success: boolean }>(`/api/recovery/deep-scan/${jobId}/cancel`, { method: "POST" }),
-  reports: () => request<Record<string, unknown>>("/api/reports"),
+  reports: () => request<WipeReportRecord[]>("/api/reports"),
   systemInfo: () => request<Record<string, string>>("/api/system-info"),
   verifyErasureStart: (body: { device: string; depth: string }) =>
     request<{ job_id: string }>("/api/verify/erasure/start", { method: "POST", body: JSON.stringify(body) }),

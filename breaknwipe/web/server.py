@@ -36,6 +36,7 @@ from ..device.filesystem import list_partitions
 from ..device.health import get_device_health
 from ..device.fsck import FilesystemChecker
 from ..device import DeviceDetector
+from .. import __version__
 
 
 class WebServer:
@@ -49,7 +50,7 @@ class WebServer:
         self.app = FastAPI(
             title="BreakNWipe Web Interface",
             description="Secure data wiping with web GUI",
-            version="1.0.0"
+            version=__version__
         )
         self.session_manager = WipeSessionManager()
         self.recovery_manager = RecoverySessionManager()
@@ -629,6 +630,36 @@ class WebServer:
                 "report_id": getattr(session, 'report_id', f"BNW-{session_id[:8]}-{int(time.time())}")
             }
 
+            # Verification outcome (None when verification wasn't requested)
+            report_data["verification"] = {
+                "enabled": session.wipe_request.verify,
+                "passed": getattr(session, 'verification_passed', None)
+            }
+
+            # Certificate artifacts + blockchain anchor, when a certificate
+            # was generated (session.certificate_files is stashed by
+            # session_manager._execute_wipe)
+            cert_files = getattr(session, 'certificate_files', None)
+            if cert_files:
+                report_data["certificate"] = {
+                    "pdf_path": cert_files.get('pdf'),
+                    "json_path": cert_files.get('json'),
+                    "qr_png_path": cert_files.get('qr_png')
+                }
+                blockchain_result = cert_files.get('blockchain_result')
+                if blockchain_result and blockchain_result.get('success'):
+                    tx_hash = blockchain_result.get('transaction_hash')
+                    report_data["blockchain"] = {
+                        "tx_hash": tx_hash,
+                        "report_hash": blockchain_result.get('report_hash'),
+                        "explorer_url": f"https://sepolia.etherscan.io/tx/{tx_hash}" if tx_hash else None
+                    }
+                else:
+                    report_data["blockchain"] = None
+            else:
+                report_data["certificate"] = None
+                report_data["blockchain"] = None
+
             return report_data
 
         @self.app.get("/api/wipe/download/{session_id}")
@@ -1012,6 +1043,7 @@ class WebServer:
 
                 # Basic system information without requiring psutil
                 system_info = {
+                    "BreakNWipe Version": __version__,
                     "Operating System": f"{platform.system()} {platform.release()}",
                     "Architecture": platform.machine(),
                     "Python Version": platform.python_version(),
