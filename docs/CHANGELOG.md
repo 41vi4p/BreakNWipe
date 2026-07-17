@@ -4,6 +4,27 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.11.1] - 2026-07-17
+
+### Fixed
+- **Docker image vulnerability hygiene** — the container build (`Dockerfile`) now runs
+  `apt-get upgrade -y -qq` right after `apt-get update` in both the `python-builder` and runtime
+  stages, before installing packages. The `ubuntu:24.04` base tag is only rebuilt periodically, so
+  packages already baked into its layers can trail behind Ubuntu's published security patches at
+  build time even though `apt-get install` pulls current versions of the packages we explicitly
+  list. Confirmed against Ubuntu noble's archive that this resolves `CVE-2026-41992`/`-41991`
+  (gzip, fixed in `1.12-1ubuntu3.2`), `CVE-2026-5704` (tar, fixed in `1.35+dfsg-3ubuntu0.3`), and
+  `CVE-2026-56136`/`-46571` (ntfs-3g, fixed in `1:2022.10.3-1.2ubuntu3.2`) — all were sitting on
+  stale pre-security-update versions baked into the base image tag, not versions we pin ourselves.
+  - `CVE-2018-11739`/`CVE-2018-11740` (sleuthkit, OOB reads in `raw.c`, CVSS 8.1 per NVD) and
+    `CVE-2025-66382` (expat, quadratic-time DoS parsing a ~2 MiB crafted XML file) remain flagged
+    with no fix version available in Debian/Ubuntu — Debian's tracker rates the TSK pair
+    "Negligible" impact (requires processing a maliciously crafted raw disk image, which isn't how
+    `device/recovery.py` invokes `fls`/`icat` — against the operator's own attached hardware, not
+    untrusted image files) and lists the expat one as "postponed" pending an upstream fix.
+    Documented here as accepted/won't-fix risk rather than something to chase — no patched package
+    exists to move to for any of the three.
+
 ## [3.11.0] - 2026-07-08
 
 ### Added

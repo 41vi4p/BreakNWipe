@@ -36,6 +36,7 @@ RUN npm run build
 FROM ubuntu:24.04 AS python-builder
 
 RUN apt-get update -qq \
+    && apt-get upgrade -y -qq \
     && apt-get install -y -qq --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -67,7 +68,15 @@ LABEL org.opencontainers.image.title="BreakNWipe" \
 # Same set as the .deb dependencies (scripts/build_packages.sh) plus the
 # fsck.py binaries missing from that list: e2fsprogs (e2fsck/resize2fs),
 # dosfstools (fsck.fat), exfatprogs (fsck.exfat).
+#
+# `apt-get upgrade` here matters even though the base image is pulled fresh:
+# the `ubuntu:24.04` tag itself is only rebuilt periodically, so packages
+# baked into its layers (not just the ones we install below) can already
+# trail behind Ubuntu's published security updates at build time -- most of
+# the CVEs a scanner flags on this image are closed by this line, not by
+# pinning individual package versions.
 RUN apt-get update -qq \
+    && apt-get upgrade -y -qq \
     && apt-get install -y -qq --no-install-recommends \
         ca-certificates \
         smartmontools \
