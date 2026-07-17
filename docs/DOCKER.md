@@ -195,6 +195,9 @@ up by hand, not by any script:
    - `DOCKERHUB_TOKEN` — the access token from step 2
 4. Push a version tag (`git tag v3.9.0 && git push --tags`) — the workflow
    publishes `<username>/breaknwipe:3.9.0`, `:3.9`, and `:latest`.
+   - If these secrets are missing, manual `workflow_dispatch` runs now skip the
+     publish steps with a notice, while `v*` tag runs still fail fast (to avoid
+     silently missing a release publish).
 
 If your Docker Hub namespace is not `41vi4p`, update the image name in
 `docker-compose.yml` and the examples in this file and `README.md`.

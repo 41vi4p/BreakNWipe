@@ -4,6 +4,11 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.11.2] - 2026-07-17
+
+### Fixed
+- **`build-and-push` workflow false failure on manual runs without Docker Hub secrets** — `.github/workflows/docker-image.yml` now treats missing `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` as a non-fatal skip for `workflow_dispatch` (emits a notice and skips publish steps), while still failing tag-triggered publish runs when the secrets are not configured.
+
 ## [3.11.1] - 2026-07-17
 
 ### Fixed
