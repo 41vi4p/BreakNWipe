@@ -4,6 +4,20 @@ All notable changes to BreakNWipe are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/). Every change to the codebase increments the version in `breaknwipe/__init__.py` and `pyproject.toml`.
 
+## [3.11.2] - 2026-07-17
+
+### Fixed
+- **Docker publish workflow failing on manual `workflow_dispatch` runs** — `docker/build-push-action`
+  errored with "tag is needed when pushing to registry" because every rule in
+  `docker/metadata-action`'s `tags:` config in `.github/workflows/docker-image.yml` was gated on
+  being on a `v*` tag ref (two `type=semver` rules plus `latest` behind
+  `startsWith(github.ref, 'refs/tags/v')`). The workflow's own trigger list includes
+  `workflow_dispatch`, but a manual run off a branch produces none of those, so
+  `steps.meta.outputs.tags` came back empty and `buildx` got no `--tag` at all. Added a
+  `type=sha,format=short` rule enabled only for `workflow_dispatch`, so manual runs (e.g. to
+  smoke-test a Dockerfile change) get a real, non-`latest` tag instead of failing or silently
+  overwriting the release tag.
+
 ## [3.11.1] - 2026-07-17
 
 ### Fixed
