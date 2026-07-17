@@ -1,15 +1,15 @@
 Package: breaknwipe
-Version: 3.10.0-1
+Version: 3.11.1-1
 Architecture: amd64
 Maintainer: CodeBreakers Team <contact@breaknwipe.org>
-Installed-Size: 282989
+Installed-Size: 283191
 Depends: smartmontools, hdparm, nvme-cli, util-linux, parted, cloud-guest-utils, lvm2, xfsprogs, ntfs-3g, btrfs-progs, sleuthkit, testdisk
 Suggests: parted, lsblk
-Filename: pool/main/b/breaknwipe/breaknwipe_3.10.0-1_amd64.deb
-Size: 91376746
-MD5sum: 7877dc1759c92e283e664e1302dee62b
-SHA1: 8d9dace5a7b125c2fe7f53ea438f51507d7f78ed
-SHA256: 75ac81a9294e05208cb1686c4ce86191a4a9ee408e588280c946820661e3cb7b
+Filename: pool/main/b/breaknwipe/breaknwipe_3.11.1-1_amd64.deb
+Size: 91424432
+MD5sum: 9ef54e6aa74b3dde5da349301a9bb2f7
+SHA1: 40e22a437e098150778d4949b680e6b42e74f962
+SHA256: 34528e37529f68d5668580ac5c43a53db388c52a64985fa0105e4080f186f159
 Section: admin
 Priority: optional
 Homepage: https://github.com/41vi4p/BreakNWipe
