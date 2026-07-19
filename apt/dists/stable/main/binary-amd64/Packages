@@ -6,10 +6,10 @@ Installed-Size: 283192
 Depends: smartmontools, hdparm, nvme-cli, util-linux, parted, cloud-guest-utils, lvm2, xfsprogs, ntfs-3g, btrfs-progs, sleuthkit, testdisk
 Suggests: parted, lsblk
 Filename: pool/main/b/breaknwipe/breaknwipe_3.11.2-1_amd64.deb
-Size: 91417382
-MD5sum: b3d61bd6ccecafb03bea9d44ec2eadcd
-SHA1: 19a865d67f7da23c61e51f9ae769d26f1f4a3c63
-SHA256: 0b094cda10531febb4a076faf92e41a272a5685cf686ae5795701e946703275b
+Size: 91436126
+MD5sum: 214c4f7a6fe29f473b3297c1a3fa880b
+SHA1: a5fea118bba59d5e66da0a070593f1e2f4ed4a19
+SHA256: 5ab9bc7160cfd35b545015a0a256df47e052276568c1a282469d661d205868c8
 Section: admin
 Priority: optional
 Homepage: https://github.com/41vi4p/BreakNWipe
