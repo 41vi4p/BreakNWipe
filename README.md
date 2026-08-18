@@ -424,11 +424,3 @@ the Free Software Foundation, either version 3 of the License, or
 ```
 
 ---
-
-<div align="center">
-
-**🇮🇳 Made for India's e-waste solution | 🌍 Promoting the global circular economy**
-
-**Developed with ❤️ by Team CodeBreakers — Smart India Hackathon 2025**
-
-</div>
